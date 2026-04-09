@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WeatherFrame</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+
+  <main class="canvas" id="captureArea">
+
+    <div class="weather-emoji" id="weatherEmoji">☀️</div>
+
+    <div class="camera-frame">
+      <video id="camera" autoplay playsinline muted></video>
+    </div>
+
+    <div class="info" id="weather">
+      Loading...
+    </div>
+
+    <button id="captureBtn">Capture</button>
+
+  </main>
+
+  
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>
