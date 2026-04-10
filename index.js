@@ -95,20 +95,53 @@ navigator.geolocation.getCurrentPosition(
   }
 );
 
-// 캡처 기능
 const captureBtn = document.getElementById("captureBtn");
-const captureArea = document.getElementById("captureArea");
 
-if (captureBtn && captureArea) {
+if (captureBtn) {
   captureBtn.addEventListener("click", async () => {
-    const canvas = await html2canvas(captureArea, {
-      backgroundColor: null,
-      scale: window.devicePixelRatio
-    });
+    try {
+      // 현재 탭/창/화면 캡처 요청
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+        preferCurrentTab: true
+      });
 
-    const link = document.createElement("a");
-    link.download = "weatherframe.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+      const screenVideo = document.createElement("video");
+      screenVideo.srcObject = stream;
+      screenVideo.muted = true;
+      screenVideo.playsInline = true;
+
+      await screenVideo.play();
+
+      // 메타데이터 기다리기
+      await new Promise(resolve => {
+        if (screenVideo.readyState >= 2) {
+          resolve();
+        } else {
+          screenVideo.onloadedmetadata = () => resolve();
+        }
+      });
+
+      // 한 프레임 캡처
+      const canvas = document.createElement("canvas");
+      canvas.width = screenVideo.videoWidth;
+      canvas.height = screenVideo.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+
+      // 다운로드
+      const link = document.createElement("a");
+      link.download = "weatherframe.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+
+      // 캡처 종료
+      stream.getTracks().forEach(track => track.stop());
+
+    } catch (err) {
+      console.error("Screen capture error:", err);
+    }
   });
 }
