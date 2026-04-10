@@ -8,11 +8,39 @@ navigator.mediaDevices.getUserMedia({ video: true })
     console.error("Camera error:", err);
   });
 
-// 위치 + 날씨
+// 도시명 가져오기
+function getCityName(lat, lon) {
+  return fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`, {
+    headers: {
+      "Accept-Language": "en"
+    }
+  })
+    .then(res => res.json())
+    .then(data => {
+      const address = data.address || {};
+
+      return (
+        address.city ||
+        address.town ||
+        address.village ||
+        address.county ||
+        address.state ||
+        "Unknown location"
+      );
+    })
+    .catch(err => {
+      console.error("City fetch error:", err);
+      return "Unknown location";
+    });
+}
+
+// 위치 + 도시 + 날씨
 navigator.geolocation.getCurrentPosition(
-  position => {
+  async position => {
     const lat = position.coords.latitude;
     const lon = position.coords.longitude;
+
+    const city = await getCityName(lat, lon);
 
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,cloud_cover,weather_code`)
       .then(res => res.json())
@@ -25,6 +53,7 @@ navigator.geolocation.getCurrentPosition(
         const code = data.current.weather_code;
 
         document.getElementById("weather").innerHTML = `
+          <p>Location: ${city}</p>
           <p>Temperature: ${temp}°C</p>
           <p>Humidity: ${humidity}%</p>
           <p>Precipitation: ${precipitation} mm</p>
@@ -95,12 +124,12 @@ navigator.geolocation.getCurrentPosition(
   }
 );
 
+// 캡처 버튼
 const captureBtn = document.getElementById("captureBtn");
 
 if (captureBtn) {
   captureBtn.addEventListener("click", async () => {
     try {
-      // 현재 탭/창/화면 캡처 요청
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
@@ -114,7 +143,6 @@ if (captureBtn) {
 
       await screenVideo.play();
 
-      // 메타데이터 기다리기
       await new Promise(resolve => {
         if (screenVideo.readyState >= 2) {
           resolve();
@@ -123,7 +151,6 @@ if (captureBtn) {
         }
       });
 
-      // 한 프레임 캡처
       const canvas = document.createElement("canvas");
       canvas.width = screenVideo.videoWidth;
       canvas.height = screenVideo.videoHeight;
@@ -131,15 +158,12 @@ if (captureBtn) {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
 
-      // 다운로드
       const link = document.createElement("a");
       link.download = "weatherframe.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
 
-      // 캡처 종료
       stream.getTracks().forEach(track => track.stop());
-
     } catch (err) {
       console.error("Screen capture error:", err);
     }
