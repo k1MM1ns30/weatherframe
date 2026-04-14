@@ -13,19 +13,31 @@
     <div class="weather-emoji" id="weatherEmoji">☀️</div>
 
     <div class="camera-frame">
-      <video id="camera" autoplay playsinline muted></video>
+      <div id="p5-container"></div>
     </div>
 
     <div class="info" id="weather">
       Loading...
     </div>
 
-    <button id="captureBtn"></button>
+    <button id="captureBtn">Capture</button>
+
+    <div class="city-wrapper">
+      <button id="mapToggle">🗺️</button>
+
+      <div class="city-buttons" id="cityButtons">
+        <button class="city-btn" data-city="New York">New York</button>
+        <button class="city-btn" data-city="Tokyo">Tokyo</button>
+        <button class="city-btn" data-city="Seoul">Seoul</button>
+        <button class="city-btn" data-city="Okinawa">Okinawa</button>
+        <button class="city-btn" data-city="London">London</button>
+        <button class="city-btn" data-city="Sydney">Australia</button>
+      </div>
+    </div>
 
   </main>
 
-  
-  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <script src="index.js"></script>
 </body>
 </html>
