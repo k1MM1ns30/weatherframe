@@ -8,10 +8,34 @@ const cityCoordinates = {
 };
 
 // =========================
-// p5 camera + sunny shimmer
+// p5 camera + hot shimmer
 // =========================
 let cam;
-let sunnyEffectOn = false;
+let hotEffectOn = false;
+let cloudyEffectOn = false;
+
+let glitterParticles = [];
+let snowEffectOn = false;
+
+const snowPalette = [
+  "#ffffff",
+  "#f9fdff",
+  "#e6f7ff",
+  "#dff4ff",
+  "#f0fbff"
+];
+
+// 현재 날씨 데이터를 저장해두고
+// 수동 필터 선택 시 다시 렌더링할 때 사용
+let latestWeatherData = null;
+let latestCityLabel = "";
+
+// null이면 실시간 날씨 사용
+// 문자열이면 그 weatherType을 강제로 사용
+let manualFilterType = null;
+
+// 현재 선택된 도시 버튼 active 표시용
+let activeCityName = null;
 
 function setup() {
   const canvas = createCanvas(320, 420);
@@ -21,7 +45,7 @@ function setup() {
   cam.size(640, 480);
   cam.hide();
 
-  pixelDensity(1);
+  pixelDensity(2);
 }
 
 function drawCameraCover(videoSource) {
@@ -50,12 +74,34 @@ function drawCameraCover(videoSource) {
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
 
+function drawCloudyWhiteOverlay() {
+  push();
+
+  noStroke();
+
+  // 위쪽이 가장 진하고 아래로 갈수록 옅어짐
+  for (let y = 0; y < height * 0.55; y++) {
+    const alpha = map(y, 0, height * 0.55, 110, 0);
+    fill(255, 255, 255, alpha);
+    rect(0, y, width, 1);
+  }
+
+  // 경계를 더 부드럽게 보이게 하는 추가 블러 느낌 레이어
+  drawingContext.filter = "blur(18px)";
+  fill(255, 255, 255, 45);
+  rect(0, 0, width, height * 0.22);
+  drawingContext.filter = "none";
+
+  pop();
+}
+
 function draw() {
   if (!cam) return;
 
   drawCameraCover(cam);
 
-  if (sunnyEffectOn) {
+
+  if (hotEffectOn) {
     loadPixels();
 
     const sourcePixels = pixels.slice();
@@ -83,6 +129,60 @@ function draw() {
     }
 
     updatePixels();
+    } else if (cloudyEffectOn) {
+    loadPixels();
+    const sourcePixels = pixels.slice();
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const index = (x + y * width) * 4;
+
+        let totalR = -3;
+        let totalG = -3;
+        let totalB = -3;
+        let count = 0.5;
+
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const i = ((x + dx) + (y + dy) * width) * 4;
+            totalR += sourcePixels[i];
+            totalG += sourcePixels[i + 1];
+            totalB += sourcePixels[i + 2];
+            count++;
+          }
+        }
+
+        pixels[index] = min((totalR / count) * 1.33, 255);
+        pixels[index + 1] = min((totalG / count) * 1.35, 255);
+        pixels[index + 2] = min((totalB / count) * 1.4, 255);
+        pixels[index + 3] = 255;
+      }
+    }
+
+    updatePixels();
+    drawCloudyWhiteOverlay();
+  }
+
+  // ❄️ snow filter overlay
+  if (snowEffectOn) {
+    if (frameCount % 4 === 0) {
+      glitterParticles.push(new FallingGlitter());
+    }
+
+    if (glitterParticles.length > 24) {
+      glitterParticles.splice(0, glitterParticles.length - 24);
+    }
+
+    for (let i = glitterParticles.length - 1; i >= 0; i--) {
+      glitterParticles[i].update();
+      glitterParticles[i].display();
+
+      if (glitterParticles[i].isOut()) {
+        glitterParticles.splice(i, 1);
+      }
+    }
+  } else {
+    glitterParticles = [];
   }
 }
 
@@ -114,16 +214,163 @@ function getCityName(lat, lon) {
     });
 }
 
+// 현재 위치 기준으로 전체 리셋해서 다시 불러오는 함수
+function loadCurrentLocationWeather() {
+  navigator.geolocation.getCurrentPosition(
+    async position => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      const city = await getCityName(lat, lon);
+
+      activeCityName = null;
+      manualFilterType = null;
+
+      updateCityButtonState();
+      updateFilterButtonState();
+
+      loadWeather(lat, lon, city);
+    },
+    error => {
+      console.error("Location error:", error);
+      document.getElementById("weather").textContent = "Location access denied";
+    }
+  );
+}
+
 // =========================
-// weather UI
+// weather type classification
 // =========================
-function updateWeatherUI(data, cityLabel) {
+function getWeatherType(data) {
   const temp = data.current.temperature_2m;
-  const humidity = data.current.relative_humidity_2m;
   const precipitation = data.current.precipitation;
   const wind = data.current.wind_speed_10m;
   const cloud = data.current.cloud_cover;
   const code = data.current.weather_code;
+
+  const isSnow = (code >= 71 && code <= 77) || code === 85 || code === 86;
+  const isFog = code === 45 || code === 48;
+  const isRain = precipitation > 0 || (code >= 51 && code <= 67) || (code >= 80 && code <= 82);
+
+  const isCloudy = cloud > 60;
+  const isCold = temp < 8;
+  const isHot = temp > 26;
+
+  const isWindy = wind > 12;
+  const isVeryWindy = wind > 20;
+
+  if (isSnow) {
+    if (isWindy) return "windy";
+    return "snow";
+  } else if (isFog) {
+    return "fog";
+  } else if (isRain) {
+    if (isWindy) return "windy";
+    return "rain";
+  } else if (isVeryWindy) {
+    return "windy";
+  } else if (isCold) {
+    return "cold";
+  } else if (isHot) {
+    return "hot";
+  } else if (isCloudy) {
+    if (isWindy) return "windy";
+    return "cloudy";
+  } else {
+    return "sunny";
+  }
+}
+
+// =========================
+// weather style mapping
+// =========================
+function getWeatherStyle(weatherType) {
+  switch (weatherType) {
+    case "snow":
+      return {
+        bgColor: "#EAF4FF",
+        emoji: "❄️",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: true
+      };
+
+    case "fog":
+      return {
+        bgColor: "#D9D9D9",
+        emoji: "🌫️",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+
+    case "rain":
+      return {
+        bgColor: "#87CEFA",
+        emoji: "🌧️",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+
+    case "windy":
+      return {
+        bgColor: "#B0E0E6",
+        emoji: "🌀",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+
+    case "cold":
+      return {
+        bgColor: "#CFE8FF",
+        emoji: "🧊",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+
+    case "hot":
+      return {
+        bgColor: "#FF6863",
+        emoji: "🔥",
+        hotEffectOn: true,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+
+    case "cloudy":
+      return {
+        bgColor: "#A9A9A9",
+        emoji: "☁️",
+        hotEffectOn: false,
+        cloudyEffectOn: true,
+        snowEffectOn: false
+      };
+
+    case "sunny":
+    default:
+      return {
+        bgColor: "#FFD700",
+        emoji: "☀️",
+        hotEffectOn: false,
+        cloudyEffectOn: false,
+        snowEffectOn: false
+      };
+  }
+}
+
+// =========================
+// render weather / filter UI
+// =========================
+function applyWeatherStyle(weatherType, cityLabel, data) {
+  const style = getWeatherStyle(weatherType);
+
+  const temp = data?.current?.temperature_2m ?? "-";
+  const humidity = data?.current?.relative_humidity_2m ?? "-";
+  const precipitation = data?.current?.precipitation ?? "-";
+  const wind = data?.current?.wind_speed_10m ?? "-";
 
   document.getElementById("weather").innerHTML = `
     <p>Location: ${cityLabel}</p>
@@ -133,53 +380,23 @@ function updateWeatherUI(data, cityLabel) {
     <p>Wind: ${wind} m/s</p>
   `;
 
-  let bgColor = "white";
+  document.body.style.backgroundColor = style.bgColor;
+  document.getElementById("weatherEmoji").textContent = style.emoji;
+  hotEffectOn = style.hotEffectOn;
+  cloudyEffectOn = style.cloudyEffectOn;
+  snowEffectOn = style.snowEffectOn;
 
-  // 1️⃣ 기본 날씨 상태 먼저
-  if (precipitation > 0 || (code >= 51 && code <= 67)) {
-    bgColor = "#87CEFA"; // 비
-  } else if (cloud < 40) {
-    bgColor = "#FFD700"; // 맑음
-  } else if (cloud > 60) {
-    bgColor = "#A9A9A9"; // 흐림
-  } else {
-    bgColor = "#D3D3D3"; // 중간
-  }
-  
+  console.log("weatherType:", weatherType, "| manualFilterType:", manualFilterType);
+}
 
+function updateWeatherUI(data, cityLabel) {
+  latestWeatherData = data;
+  latestCityLabel = cityLabel;
 
-  // 2️⃣ 온도 (더움) → 덮어쓰기 (최우선)
-  if (temp > 30) {
-    bgColor = "#ff6863";
-  }
-  
+  const liveWeatherType = getWeatherType(data);
+  const finalWeatherType = manualFilterType || liveWeatherType;
 
-   if (wind > 30) {
-    bgColor = "#B0E0E6";
-  }
-
-
-  document.body.style.backgroundColor = bgColor;
-
-  const emojiBox = document.getElementById("weatherEmoji");
-  let emoji = "☀️";
-
-  if (cloud < 40) {
-    emoji = "☀️";
-  } else if (precipitation > 0 || (code >= 51 && code <= 67)) {
-    emoji = "🌧️";
-  } else if (cloud > 60) {
-    emoji = "🌫️";
-  } else if (wind > 30) {
-    emoji = "🌀";
-  } else if (humidity > 80) {
-    emoji = "💧";
-  }
-
-  emojiBox.textContent = emoji;
-
-  // 맑은 날에만 아지랑이 효과 on
-  sunnyEffectOn = (cloud < 40) && !(precipitation > 0 || (code >= 51 && code <= 67));
+  applyWeatherStyle(finalWeatherType, cityLabel, data);
 }
 
 // =========================
@@ -197,27 +414,150 @@ function loadWeather(lat, lon, cityLabel) {
     });
 }
 
+class FallingGlitter {
+  constructor() {
+    this.x = random(width);
+    this.y = random(-100, height * 0.3);
+
+    this.vx = random(-0.15, 0.15);
+    this.vy = random(1.2, 2.8);
+
+    this.size = random(5, 10);
+
+    this.color = color(random(snowPalette));
+
+    this.alphaBase = random(200, 255);
+    this.alpha = this.alphaBase;
+
+    this.twinkleSpeed = random(0.02, 0.06);
+    this.twinkleOffset = random(TWO_PI);
+
+    this.shapeType = floor(random(3));
+
+    this.seed = random(1000);
+    this.tailLength = random(20, 46);
+
+    this.clusterPoints = [];
+    if (this.shapeType === 2) {
+      let pointCount = floor(random(10, 15));
+      for (let i = 0; i < pointCount; i++) {
+        this.clusterPoints.push({
+          ox: randomGaussian(0, this.size * 0.55),
+          oy: randomGaussian(0, this.size * 0.55),
+          r: random(0.8, 1.5)
+        });
+      }
+    }
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.x += sin(frameCount * 0.025 + this.seed) * 0.06;
+
+    this.alpha =
+      this.alphaBase +
+      sin(frameCount * this.twinkleSpeed + this.twinkleOffset) * 35;
+  }
+
+  display() {
+    push();
+    translate(this.x, this.y);
+
+    const c = color(this.color);
+
+    if (this.shapeType === 0) {
+      drawingContext.shadowBlur = this.size * 1.2;
+      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
+
+      stroke(red(c), green(c), blue(c), this.alpha);
+      strokeWeight(1.1);
+
+      line(-this.size * 0.9, 0, this.size * 0.9, 0);
+      line(0, -this.size * 0.9, 0, this.size * 0.9);
+
+      line(-this.size * 0.42, -this.size * 0.42, this.size * 0.42, this.size * 0.42);
+      line(-this.size * 0.42, this.size * 0.42, this.size * 0.42, -this.size * 0.42);
+
+      noStroke();
+      fill(red(c), green(c), blue(c), this.alpha);
+      circle(0, 0, this.size * 0.22);
+
+    } else if (this.shapeType === 1) {
+      drawingContext.shadowBlur = this.tailLength * 0.1;
+      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
+
+      let segments = 4;
+      for (let i = 0; i < segments; i++) {
+        let t1 = i / segments;
+        let t2 = (i + 1) / segments;
+
+        let y1 = lerp(-this.tailLength, 0, t1);
+        let y2 = lerp(-this.tailLength, 0, t2);
+
+        let segAlpha = lerp(this.alpha * 0.12, this.alpha * 0.55, t2);
+        let segWeight = lerp(0.25, 1.35, t2);
+
+        stroke(red(c), green(c), blue(c), segAlpha);
+        strokeWeight(segWeight);
+        line(0, y1, 0, y2);
+      }
+
+      drawingContext.shadowBlur = this.size * 0.9;
+      stroke(red(c), green(c), blue(c), this.alpha);
+      strokeWeight(1);
+
+      line(-this.size * 0.55, 0, this.size * 0.55, 0);
+      line(0, -this.size * 0.55, 0, this.size * 0.55);
+
+      noStroke();
+      fill(red(c), green(c), blue(c), this.alpha);
+      circle(0, 0, this.size * 0.16);
+
+    } else if (this.shapeType === 2) {
+      noStroke();
+
+      for (let p of this.clusterPoints) {
+        let localAlpha = this.alpha * 0.85;
+
+        drawingContext.shadowBlur = p.r * 1.8;
+        drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${localAlpha / 255})`;
+
+        fill(red(c), green(c), blue(c), localAlpha);
+        circle(p.ox, p.oy, p.r);
+      }
+    }
+
+    pop();
+    drawingContext.shadowBlur = 0;
+  }
+
+  isOut() {
+    return this.y > height + this.tailLength + 20;
+  }
+}
+
 // =========================
 // initial load: current location
 // =========================
-navigator.geolocation.getCurrentPosition(
-  async position => {
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-
-    const city = await getCityName(lat, lon);
-    loadWeather(lat, lon, city);
-  },
-  error => {
-    console.error("Location error:", error);
-    document.getElementById("weather").textContent = "Location access denied";
-  }
-);
+loadCurrentLocationWeather();
 
 // =========================
 // city button clicks
 // =========================
 const cityButtons = document.querySelectorAll(".city-btn");
+
+function updateCityButtonState() {
+  cityButtons.forEach(button => {
+    const cityName = button.dataset.city;
+
+    if (cityName === activeCityName) {
+      button.classList.add("active");
+    } else {
+      button.classList.remove("active");
+    }
+  });
+}
 
 cityButtons.forEach(button => {
   button.addEventListener("click", () => {
@@ -225,6 +565,12 @@ cityButtons.forEach(button => {
     const cityData = cityCoordinates[cityName];
 
     if (cityData) {
+      activeCityName = cityName;
+      manualFilterType = null;
+
+      updateCityButtonState();
+      updateFilterButtonState();
+
       loadWeather(cityData.lat, cityData.lon, cityData.label);
     }
   });
@@ -243,6 +589,58 @@ if (mapToggle && cityButtonsWrap) {
 }
 
 // =========================
+// filter toggle + filter buttons
+// =========================
+const filterToggle = document.getElementById("filterToggle");
+const filterButtonsWrap = document.getElementById("filterButtons");
+const filterButtons = document.querySelectorAll(".filter-btn");
+
+function updateFilterButtonState() {
+  filterButtons.forEach(button => {
+    const filterName = button.dataset.filter;
+
+    if (
+      (filterName === "live" && manualFilterType === null) ||
+      (filterName !== "live" && filterName === manualFilterType)
+    ) {
+      button.classList.add("active");
+    } else {
+      button.classList.remove("active");
+    }
+  });
+}
+
+if (filterToggle && filterButtonsWrap) {
+  filterToggle.addEventListener("click", () => {
+    filterButtonsWrap.classList.toggle("active");
+  });
+}
+
+filterButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    const selectedFilter = button.dataset.filter;
+
+    if (selectedFilter === "live") {
+      loadCurrentLocationWeather();
+      return;
+    } else {
+      manualFilterType = selectedFilter;
+    }
+
+    updateFilterButtonState();
+
+    if (latestWeatherData) {
+      const liveWeatherType = getWeatherType(latestWeatherData);
+      const finalWeatherType = manualFilterType || liveWeatherType;
+      applyWeatherStyle(finalWeatherType, latestCityLabel, latestWeatherData);
+    }
+  });
+});
+
+updateFilterButtonState();
+updateCityButtonState();
+
+// =========================
 // capture button
 // =========================
 const captureBtn = document.getElementById("captureBtn");
@@ -256,34 +654,24 @@ if (captureBtn) {
         preferCurrentTab: true
       });
 
-      const screenVideo = document.createElement("video");
-      screenVideo.srcObject = stream;
-      screenVideo.muted = true;
-      screenVideo.playsInline = true;
-
-      await screenVideo.play();
-
-      await new Promise(resolve => {
-        if (screenVideo.readyState >= 2) {
-          resolve();
-        } else {
-          screenVideo.onloadedmetadata = () => resolve();
-        }
-      });
+      const track = stream.getVideoTracks()[0];
+      const imageCapture = new ImageCapture(track);
+      const bitmap = await imageCapture.grabFrame();
 
       const canvas = document.createElement("canvas");
-      canvas.width = screenVideo.videoWidth;
-      canvas.height = screenVideo.videoHeight;
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
 
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
       const link = document.createElement("a");
       link.download = "weatherframe.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
 
-      stream.getTracks().forEach(track => track.stop());
+      track.stop();
+      stream.getTracks().forEach(t => t.stop());
     } catch (err) {
       console.error("Screen capture error:", err);
     }

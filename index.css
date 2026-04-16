@@ -5,13 +5,23 @@ body {
   transition: background-color 0.5s ease;
 }
 
-/* 전체 중앙 정렬 */
+/* 전체 중앙 정렬 + 캡쳐 영역 */
 .canvas {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  position: relative; /* 추가 */
+}
+
+/* 캡쳐 대상 영역 */
+#captureArea {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  background-color: inherit; /* 추가 */
+  overflow: hidden; /* 추가 */
 }
 
 #p5-container {
@@ -23,7 +33,7 @@ body {
   width: 100%;
   height: 100%;
   display: block;
-  transform: scaleX(-1); /* ← 기존 좌우반전 유지 */
+  transform: scaleX(-1);
 }
 
 /* 📷 카메라 프레임 */
@@ -36,15 +46,7 @@ body {
   position: relative;
 }
 
-/* 실제 카메라 */
-/* #camera {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1); /* 좌우 반전 
-} */
-
-/* 텍스트 (아래로 내림) */
+/* 텍스트 */
 .info {
   margin-top: 30px;
   text-align: center;
@@ -53,12 +55,14 @@ body {
   line-height: 0.8;
 }
 
+/* 이모지 */
 .weather-emoji {
   position: relative;
   margin-bottom: 35px;
   font-size: 35px;
   line-height: 1;
   text-align: center;
+  z-index: 1; /* 추가 */
 
   text-shadow:
     0 0 10px rgba(255,255,255,0.8),
@@ -78,12 +82,13 @@ body {
   transform: translate(-50%, -50%);
   filter: blur(20px);
   z-index: -1;
+  pointer-events: none; /* 추가 */
 }
 
 #captureBtn {
   width: 60px;
   height: 60px;
-  font-size: 12px;;
+  font-size: 12px;
   justify-content: center;
   border-radius: 30px;
   margin-top: 20px;
@@ -97,14 +102,12 @@ body {
   position: fixed;
   bottom: 20px;
   right: 20px;
-
   display: flex;
   align-items: center;
-  flex-direction: row-reverse; /* 🗺️를 맨 오른쪽으로 */
+  flex-direction: row-reverse;
+  z-index: 10; /* 추가 */
 }
 
-
-/* 🗺️ 버튼 */
 #mapToggle {
   width: 50px;
   height: 50px;
@@ -115,32 +118,81 @@ body {
   font-size: 30px;
 }
 
-/* 버튼 컨테이너 */
 .city-buttons {
   display: flex;
   gap: 8px;
-
   margin-right: 10px;
-
   transform: translateX(100%);
   opacity: 0;
   pointer-events: none;
-
   transition: all 0.3s ease;
 }
 
-/* 열렸을 때 */
 .city-buttons.active {
   transform: translateX(0);
   opacity: 1;
   pointer-events: auto;
 }
 
-/* 버튼 */
 .city-btn {
   padding: 6px 10px;
   font-size: 12px;
   background: rgba(255,255,255,0.7);
   border: 1px solid black;
   cursor: pointer;
+}
+
+.city-btn.active {
+  background: black;
+  color: white;
+}
+
+/* 🌟 필터 버튼 */
+.filter-wrapper {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  z-index: 10; /* 추가 */
+}
+
+#filterToggle {
+  width: 50px;
+  height: 50px;
+  border-radius: 25px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 30px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: 10px;
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.filter-buttons.active {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.filter-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid black;
+  cursor: pointer;
+}
+
+.filter-btn.active {
+  background: black;
+  color: white;
 }
