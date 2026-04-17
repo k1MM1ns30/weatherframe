@@ -45,7 +45,7 @@ function setup() {
   cam.size(640, 480);
   cam.hide();
 
-  pixelDensity(2);
+  pixelDensity(1);
 }
 
 function drawCameraCover(videoSource) {
@@ -137,9 +137,9 @@ function draw() {
       for (let x = 1; x < width - 1; x++) {
         const index = (x + y * width) * 4;
 
-        let totalR = -3;
-        let totalG = -3;
-        let totalB = -3;
+        let totalR = -2;
+        let totalG = -2;
+        let totalB = -2;
         let count = 0.5;
 
         for (let dy = -1; dy <= 1; dy++) {
@@ -152,9 +152,9 @@ function draw() {
           }
         }
 
-        pixels[index] = min((totalR / count) * 1.33, 255);
-        pixels[index + 1] = min((totalG / count) * 1.35, 255);
-        pixels[index + 2] = min((totalB / count) * 1.4, 255);
+        pixels[index] = min((totalR / count) * 1.3, 255);
+        pixels[index + 1] = min((totalG / count) * 1.33, 255);
+        pixels[index + 2] = min((totalB / count) * 1.45, 255);
         pixels[index + 3] = 255;
       }
     }
@@ -654,24 +654,34 @@ if (captureBtn) {
         preferCurrentTab: true
       });
 
-      const track = stream.getVideoTracks()[0];
-      const imageCapture = new ImageCapture(track);
-      const bitmap = await imageCapture.grabFrame();
+      const screenVideo = document.createElement("video");
+      screenVideo.srcObject = stream;
+      screenVideo.muted = true;
+      screenVideo.playsInline = true;
+
+      await screenVideo.play();
+
+      await new Promise(resolve => {
+        if (screenVideo.readyState >= 2) {
+          resolve();
+        } else {
+          screenVideo.onloadedmetadata = () => resolve();
+        }
+      });
 
       const canvas = document.createElement("canvas");
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
+      canvas.width = screenVideo.videoWidth;
+      canvas.height = screenVideo.videoHeight;
 
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
 
       const link = document.createElement("a");
       link.download = "weatherframe.png";
       link.href = canvas.toDataURL("image/png");
       link.click();
 
-      track.stop();
-      stream.getTracks().forEach(t => t.stop());
+      stream.getTracks().forEach(track => track.stop());
     } catch (err) {
       console.error("Screen capture error:", err);
     }
