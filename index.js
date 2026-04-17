@@ -647,43 +647,32 @@ const captureBtn = document.getElementById("captureBtn");
 
 if (captureBtn) {
   captureBtn.addEventListener("click", async () => {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-        preferCurrentTab: true
-      });
+    const cityWrapper = document.querySelector(".city-wrapper");
+    const filterWrapper = document.querySelector(".filter-wrapper");
+    const captureButton = document.getElementById("captureBtn");
 
-      const screenVideo = document.createElement("video");
-      screenVideo.srcObject = stream;
-      screenVideo.muted = true;
-      screenVideo.playsInline = true;
+    // 저장할 때 제외
+    cityWrapper.style.visibility = "hidden";
+    filterWrapper.style.visibility = "hidden";
+    captureButton.style.visibility = "hidden";
 
-      await screenVideo.play();
+    const target = document.getElementById("captureArea");
 
-      await new Promise(resolve => {
-        if (screenVideo.readyState >= 2) {
-          resolve();
-        } else {
-          screenVideo.onloadedmetadata = () => resolve();
-        }
-      });
+    const bg = getComputedStyle(document.body).backgroundColor;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = screenVideo.videoWidth;
-      canvas.height = screenVideo.videoHeight;
+    const canvas = await html2canvas(target, {
+      backgroundColor: bg,
+      useCORS: true
+    });
 
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(screenVideo, 0, 0, canvas.width, canvas.height);
+    const link = document.createElement("a");
+    link.download = "weatherframe.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
 
-      const link = document.createElement("a");
-      link.download = "weatherframe.png";
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-
-      stream.getTracks().forEach(track => track.stop());
-    } catch (err) {
-      console.error("Screen capture error:", err);
-    }
+    // 다시 보이게
+    cityWrapper.style.visibility = "visible";
+    filterWrapper.style.visibility = "visible";
+    captureButton.style.visibility = "visible";
   });
 }
