@@ -17,6 +17,7 @@ const cityCoordinates = {
 let cam;
 let hotEffectOn = false;
 let cloudyEffectOn = false;
+let fogEffectOn = false;
 
 let glitterParticles = [];
 let snowEffectOn = false;
@@ -117,74 +118,127 @@ function drawCloudyWhiteOverlay() {
   pop();
 }
 
+function drawFogPixelated(videoSource) {
+  const srcW = videoSource.width;
+  const srcH = videoSource.height;
+  const destW = width;
+  const destH = height;
+
+  const srcRatio = srcW / srcH;
+  const destRatio = destW / destH;
+
+  let sx, sy, sw, sh;
+
+  if (srcRatio > destRatio) {
+    sh = srcH;
+    sw = srcH * destRatio;
+    sx = (srcW - sw) / 2;
+    sy = 0;
+  } else {
+    sw = srcW;
+    sh = srcW / destRatio;
+    sx = 0;
+    sy = (srcH - sh) / 2;
+  }
+
+  const blockSize = window.innerWidth <= 460 ? 12 : 10;
+
+  videoSource.loadPixels();
+  noStroke();
+
+  for (let y = 0; y < destH; y += blockSize) {
+    for (let x = 0; x < destW; x += blockSize) {
+      const sampleX = floor(map(x, 0, destW, sx, sx + sw - 1));
+      const sampleY = floor(map(y, 0, destH, sy, sy + sh - 1));
+
+      const index = (sampleX + sampleY * srcW) * 4;
+
+      const r = videoSource.pixels[index];
+      const g = videoSource.pixels[index + 1];
+      const b = videoSource.pixels[index + 2];
+
+      fill(r, g, b, 220);
+      rect(x, y, blockSize, blockSize);
+    }
+  }
+
+  fill(255, 255, 255, 35);
+  rect(0, 0, width, height);
+}
+
 function draw() {
   if (!cam) return;
 
-  drawCameraCover(cam);
+  if (fogEffectOn) {
+    drawFogPixelated(cam);
 
-  if (hotEffectOn) {
-  loadPixels();
-  const sourcePixels = pixels.slice();
+  } else {
+    drawCameraCover(cam);
 
-  const waveAmount = window.innerWidth <= 460 ? 10 : 20;
+    if (hotEffectOn) {
+      loadPixels();
+      const sourcePixels = pixels.slice();
 
-  for (let y = 0; y < height; y++) {
-    const wave = map(
-      noise(y * 0.005, frameCount * 0.01),
-      0, 1,
-      -waveAmount, waveAmount
-    );
+      const waveAmount = window.innerWidth <= 460 ? 10 : 20;
 
-    for (let x = 0; x < width; x++) {
-      const index = (x + y * width) * 4;
+      for (let y = 0; y < height; y++) {
+        const wave = map(
+          noise(y * 0.005, frameCount * 0.01),
+          0, 1,
+          -waveAmount, waveAmount
+        );
 
-      let shiftedY = floor(y + wave);
-      shiftedY = constrain(shiftedY, 0, height - 1);
+        for (let x = 0; x < width; x++) {
+          const index = (x + y * width) * 4;
 
-      const shiftedIndex = (x + shiftedY * width) * 4;
+          let shiftedY = floor(y + wave);
+          shiftedY = constrain(shiftedY, 0, height - 1);
 
-      pixels[index] = sourcePixels[shiftedIndex];
-      pixels[index + 1] = sourcePixels[shiftedIndex + 1];
-      pixels[index + 2] = sourcePixels[shiftedIndex + 2];
-      pixels[index + 3] = sourcePixels[shiftedIndex + 3];
-    }
-  }
+          const shiftedIndex = (x + shiftedY * width) * 4;
 
-  updatePixels();
-
-  } else if (cloudyEffectOn) {
-  loadPixels();
-  const sourcePixels = pixels.slice();
-
-  for (let y = 1; y < height - 1; y++) {
-    for (let x = 1; x < width - 1; x++) {
-      const index = (x + y * width) * 4;
-
-      let totalR = -2;
-      let totalG = -2;
-      let totalB = -2;
-      let count = 0.5;
-
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const i = ((x + dx) + (y + dy) * width) * 4;
-          totalR += sourcePixels[i];
-          totalG += sourcePixels[i + 1];
-          totalB += sourcePixels[i + 2];
-          count++;
+          pixels[index] = sourcePixels[shiftedIndex];
+          pixels[index + 1] = sourcePixels[shiftedIndex + 1];
+          pixels[index + 2] = sourcePixels[shiftedIndex + 2];
+          pixels[index + 3] = sourcePixels[shiftedIndex + 3];
         }
       }
 
-      pixels[index] = min((totalR / count) * 1.3, 255);
-      pixels[index + 1] = min((totalG / count) * 1.33, 255);
-      pixels[index + 2] = min((totalB / count) * 1.45, 255);
-      pixels[index + 3] = 255;
+      updatePixels();
+
+    } else if (cloudyEffectOn) {
+      loadPixels();
+      const sourcePixels = pixels.slice();
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const index = (x + y * width) * 4;
+
+          let totalR = -2;
+          let totalG = -2;
+          let totalB = -2;
+          let count = 0.5;
+
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const i = ((x + dx) + (y + dy) * width) * 4;
+              totalR += sourcePixels[i];
+              totalG += sourcePixels[i + 1];
+              totalB += sourcePixels[i + 2];
+              count++;
+            }
+          }
+
+          pixels[index] = min((totalR / count) * 1.3, 255);
+          pixels[index + 1] = min((totalG / count) * 1.33, 255);
+          pixels[index + 2] = min((totalB / count) * 1.45, 255);
+          pixels[index + 3] = 255;
+        }
+      }
+
+      updatePixels();
+      drawCloudyWhiteOverlay();
     }
   }
-
-  updatePixels();
-  drawCloudyWhiteOverlay();
-}
 
   if (snowEffectOn) {
     if (frameCount % 4 === 0) {
@@ -314,7 +368,8 @@ function getWeatherStyle(weatherType) {
         emoji: "❄️",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: true
+        snowEffectOn: true,
+        fogEffectOn: false
       };
 
     case "fog":
@@ -323,7 +378,8 @@ function getWeatherStyle(weatherType) {
         emoji: "🌫️",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: true
       };
 
     case "rain":
@@ -332,7 +388,8 @@ function getWeatherStyle(weatherType) {
         emoji: "🌧️",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
 
     case "windy":
@@ -341,7 +398,8 @@ function getWeatherStyle(weatherType) {
         emoji: "🌀",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
 
     case "cold":
@@ -350,7 +408,8 @@ function getWeatherStyle(weatherType) {
         emoji: "🧊",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
 
     case "hot":
@@ -359,7 +418,8 @@ function getWeatherStyle(weatherType) {
         emoji: "🔥",
         hotEffectOn: true,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
 
     case "cloudy":
@@ -368,7 +428,8 @@ function getWeatherStyle(weatherType) {
         emoji: "☁️",
         hotEffectOn: false,
         cloudyEffectOn: true,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
 
     case "sunny":
@@ -378,7 +439,8 @@ function getWeatherStyle(weatherType) {
         emoji: "☀️",
         hotEffectOn: false,
         cloudyEffectOn: false,
-        snowEffectOn: false
+        snowEffectOn: false,
+        fogEffectOn: false
       };
   }
 }
@@ -393,6 +455,7 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   const humidity = data?.current?.relative_humidity_2m ?? "-";
   const precipitation = data?.current?.precipitation ?? "-";
   const wind = data?.current?.wind_speed_10m ?? "-";
+  
 
   document.getElementById("weather").innerHTML = `
     <p>Location: ${cityLabel}</p>
@@ -407,6 +470,7 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   hotEffectOn = style.hotEffectOn;
   cloudyEffectOn = style.cloudyEffectOn;
   snowEffectOn = style.snowEffectOn;
+  fogEffectOn = style.fogEffectOn;
 
   console.log("weatherType:", weatherType, "| manualFilterType:", manualFilterType);
 }
