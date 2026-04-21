@@ -55,22 +55,30 @@ function getFrameSize() {
 
 function setup() {
   const { frameWidth, frameHeight } = getFrameSize();
+  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
 
   const canvas = createCanvas(frameWidth, frameHeight);
   canvas.parent("p5-container");
 
-  cam = createCapture(
-    {
-      video: {
-        facingMode: { ideal: "user" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        aspectRatio: { ideal: 16 / 9 },
-        frameRate: { ideal: 30, max: 30 },
-        resizeMode: "none"
-      },
-      audio: false
+  const mobileConstraints = {
+    video: {
+      facingMode: { ideal: "user" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      aspectRatio: { ideal: 16 / 9 },
+      frameRate: { ideal: 30, max: 30 },
+      resizeMode: "none"
     },
+    audio: false
+  };
+
+  const desktopConstraints = {
+    video: true,
+    audio: false
+  };
+
+  cam = createCapture(
+    isMobile ? mobileConstraints : desktopConstraints,
     () => {
       if (!cam || !cam.elt) return;
 
@@ -94,8 +102,7 @@ function setup() {
     }
   );
 
-
-  if (window.innerWidth > MOBILE_BREAKPOINT) {
+  if (!isMobile) {
     cam.size(640, 480);
   }
 
@@ -103,14 +110,22 @@ function setup() {
   pixelDensity(1);
 }
 
+
 function windowResized() {
   const { frameWidth, frameHeight } = getFrameSize();
   resizeCanvas(frameWidth, frameHeight);
 }
 
 function drawCameraCover(videoSource) {
-  const srcW = videoSource.elt?.videoWidth || videoSource.width;
-  const srcH = videoSource.elt?.videoHeight || videoSource.height;
+  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+
+  const srcW = isMobile
+    ? (videoSource.elt?.videoWidth || videoSource.width)
+    : (videoSource.width || videoSource.elt?.videoWidth);
+
+  const srcH = isMobile
+    ? (videoSource.elt?.videoHeight || videoSource.height)
+    : (videoSource.height || videoSource.elt?.videoHeight);
 
   if (!srcW || !srcH) return;
 
@@ -137,10 +152,9 @@ function drawCameraCover(videoSource) {
     sy = (srcH - sh) / 2;
   }
 
-  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-  const zoomFactor = isMobile ? 1.18 : 1;
-
-  if (zoomFactor > 1) {
+  // 모바일에서만 살짝 크롭해서 광각 느낌 줄이기
+  if (isMobile) {
+    const zoomFactor = 1.18;
     const zoomedSw = sw / zoomFactor;
     const zoomedSh = sh / zoomFactor;
     sx += (sw - zoomedSw) / 2;
@@ -151,6 +165,7 @@ function drawCameraCover(videoSource) {
 
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
+
 
 
 function drawCloudyWhiteOverlay() {
