@@ -30,6 +30,10 @@ const snowPalette = [
   "#f0fbff"
 ];
 
+const MOBILE_BREAKPOINT = 460;
+let cameraReady = false;
+
+
 // 현재 날씨 데이터를 저장해두고
 // 수동 필터 선택 시 다시 렌더링할 때 사용
 let latestWeatherData = null;
@@ -42,57 +46,82 @@ let manualFilterType = null;
 // 현재 선택된 도시 버튼 active 표시용
 let activeCityName = null;
 
-function setup() {
-  const rawFrameWidth = window.innerWidth <= 460
+function getFrameSize() {
+  const rawFrameWidth = window.innerWidth <= MOBILE_BREAKPOINT
     ? window.innerWidth * 0.95
     : Math.min(window.innerWidth * 0.82, 320);
 
   const frameWidth = Math.round(rawFrameWidth);
   const frameHeight = Math.round(frameWidth * 1.3125);
+
+  return { frameWidth, frameHeight };
+}
+
+function setup() {
+  const { frameWidth, frameHeight } = getFrameSize();
 
   const canvas = createCanvas(frameWidth, frameHeight);
   canvas.parent("p5-container");
 
-  cam = createCapture(VIDEO);
-  if (window.innerWidth > 460) {
+  cam = createCapture(
+    {
+      video: {
+        facingMode: "user"
+      },
+      audio: false
+    },
+    () => {
+      if (!cam || !cam.elt) return;
+
+      const markCameraReady = () => {
+        if (cam.elt.videoWidth > 0 && cam.elt.videoHeight > 0) {
+          cameraReady = true;
+        }
+      };
+
+      cam.elt.setAttribute("playsinline", "");
+      cam.elt.setAttribute("autoplay", "");
+      cam.elt.setAttribute("muted", "");
+
+      cam.elt.playsInline = true;
+      cam.elt.muted = true;
+
+      cam.elt.addEventListener("loadedmetadata", markCameraReady);
+      cam.elt.addEventListener("playing", markCameraReady);
+
+      markCameraReady();
+    }
+  );
+
+  if (window.innerWidth > MOBILE_BREAKPOINT) {
     cam.size(640, 480);
   }
-  cam.hide();
 
+  cam.hide();
   pixelDensity(1);
 }
 
 function windowResized() {
-  const rawFrameWidth = window.innerWidth <= 460
-    ? window.innerWidth * 0.95
-    : Math.min(window.innerWidth * 0.82, 320);
-
-  const frameWidth = Math.round(rawFrameWidth);
-  const frameHeight = Math.round(frameWidth * 1.3125);
-
+  const { frameWidth, frameHeight } = getFrameSize();
   resizeCanvas(frameWidth, frameHeight);
 }
 
 function drawCameraCover(videoSource) {
-  const isMobile = window.innerWidth <= 460;
+  const srcW = videoSource.elt?.videoWidth || videoSource.width;
+  const srcH = videoSource.elt?.videoHeight || videoSource.height;
 
-  const srcW = isMobile
-    ? (videoSource.elt.videoWidth || videoSource.width)
-    : videoSource.width;
-
-  const srcH = isMobile
-    ? (videoSource.elt.videoHeight || videoSource.height)
-    : videoSource.height;
+  if (!srcW || !srcH) return;
 
   const destW = width;
   const destH = height;
 
-  if (!srcW || !srcH) return;
-
   const srcRatio = srcW / srcH;
   const destRatio = destW / destH;
 
-  let sx, sy, sw, sh;
+  let sx;
+  let sy;
+  let sw;
+  let sh;
 
   if (srcRatio > destRatio) {
     sh = srcH;
@@ -108,6 +137,7 @@ function drawCameraCover(videoSource) {
 
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
+
 
 function drawCloudyWhiteOverlay() {
   push();
@@ -168,6 +198,13 @@ function drawCameraCover(videoSource) {
 
 function draw() {
   if (!cam) return;
+
+  const videoW = cam.elt?.videoWidth || 0;
+  const videoH = cam.elt?.videoHeight || 0;
+
+  if (!cameraReady && (!videoW || !videoH)) {
+    return;
+  }
 
   if (fogEffectOn) {
     drawFogPixelated(cam);
