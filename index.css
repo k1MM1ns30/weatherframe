@@ -332,7 +332,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    overflow-y: auto;
   }
 
   .city-buttons {
@@ -401,8 +400,4 @@ body {
     margin-top: 2px;
   }
 
-  .city-buttons,
-  .filter-buttons {
-    max-height: 32dvh;
-  }
 }
