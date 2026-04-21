@@ -250,7 +250,7 @@ body {
 
   .weather-emoji {
     margin-bottom: 16px;
-    font-size: 35px;
+    font-size: 20px;
   }
 
   .weather-emoji::before {

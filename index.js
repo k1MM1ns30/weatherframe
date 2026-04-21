@@ -1,6 +1,4 @@
-
-window.innerWidth
-document.documentElement.clientWidth
+const MOBILE_BREAKPOINT = 460;
 
 const cityCoordinates = {
   "New York": { lat: 40.7128, lon: -74.0060, label: "New York" },
@@ -12,15 +10,17 @@ const cityCoordinates = {
 };
 
 // =========================
-// p5 camera + hot shimmer
+// p5 camera + weather effects
 // =========================
 let cam;
+let cameraReady = false;
+
 let hotEffectOn = false;
 let cloudyEffectOn = false;
 let fogEffectOn = false;
+let snowEffectOn = false;
 
 let glitterParticles = [];
-let snowEffectOn = false;
 
 const snowPalette = [
   "#ffffff",
@@ -29,10 +29,6 @@ const snowPalette = [
   "#dff4ff",
   "#f0fbff"
 ];
-
-const MOBILE_BREAKPOINT = 460;
-let cameraReady = false;
-
 
 // 현재 날씨 데이터를 저장해두고
 // 수동 필터 선택 시 다시 렌더링할 때 사용
@@ -138,20 +134,16 @@ function drawCameraCover(videoSource) {
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
 
-
 function drawCloudyWhiteOverlay() {
   push();
-
   noStroke();
 
-  // 위쪽이 가장 진하고 아래로 갈수록 옅어짐
   for (let y = 0; y < height * 0.55; y++) {
     const alpha = map(y, 0, height * 0.55, 110, 0);
     fill(255, 255, 255, alpha);
     rect(0, y, width, 1);
   }
 
-  // 경계를 더 부드럽게 보이게 하는 추가 블러 느낌 레이어
   drawingContext.filter = "blur(18px)";
   fill(255, 255, 255, 45);
   rect(0, 0, width, height * 0.22);
@@ -160,40 +152,70 @@ function drawCloudyWhiteOverlay() {
   pop();
 }
 
-function drawCameraCover(videoSource) {
-  const isMobile = window.innerWidth <= 460;
+function drawFogPixelated(videoSource) {
+  drawCameraCover(videoSource);
 
-  const srcW = isMobile
-    ? (videoSource.elt.videoWidth || videoSource.width)
-    : videoSource.width;
+  loadPixels();
+  const sourcePixels = pixels.slice();
 
-  const srcH = isMobile
-    ? (videoSource.elt.videoHeight || videoSource.height)
-    : videoSource.height;
+  const blockSize = window.innerWidth <= MOBILE_BREAKPOINT ? 10 : 8;
 
-  const destW = width;
-  const destH = height;
+  for (let y = 0; y < height; y += blockSize) {
+    for (let x = 0; x < width; x += blockSize) {
+      let totalR = 0;
+      let totalG = 0;
+      let totalB = 0;
+      let count = 0;
 
-  if (!srcW || !srcH) return;
+      for (let yy = y; yy < min(y + blockSize, height); yy++) {
+        for (let xx = x; xx < min(x + blockSize, width); xx++) {
+          const i = (xx + yy * width) * 4;
+          totalR += sourcePixels[i];
+          totalG += sourcePixels[i + 1];
+          totalB += sourcePixels[i + 2];
+          count++;
+        }
+      }
 
-  const srcRatio = srcW / srcH;
-  const destRatio = destW / destH;
+      const avgR = min((totalR / count) * 1.05 + 20, 255);
+      const avgG = min((totalG / count) * 1.08 + 20, 255);
+      const avgB = min((totalB / count) * 1.12 + 24, 255);
 
-  let sx, sy, sw, sh;
-
-  if (srcRatio > destRatio) {
-    sh = srcH;
-    sw = srcH * destRatio;
-    sx = (srcW - sw) / 2;
-    sy = 0;
-  } else {
-    sw = srcW;
-    sh = srcW / destRatio;
-    sx = 0;
-    sy = (srcH - sh) / 2;
+      for (let yy = y; yy < min(y + blockSize, height); yy++) {
+        for (let xx = x; xx < min(x + blockSize, width); xx++) {
+          const i = (xx + yy * width) * 4;
+          pixels[i] = avgR;
+          pixels[i + 1] = avgG;
+          pixels[i + 2] = avgB;
+          pixels[i + 3] = 255;
+        }
+      }
+    }
   }
 
-  image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
+  updatePixels();
+
+  push();
+  noStroke();
+
+  for (let y = 0; y < height; y++) {
+    const alpha = map(y, 0, height, 70, 16);
+    fill(255, 255, 255, alpha);
+    rect(0, y, width, 1);
+  }
+
+  drawingContext.filter = "blur(20px)";
+
+  const driftA = sin(frameCount * 0.01) * width * 0.04;
+  const driftB = cos(frameCount * 0.008) * width * 0.05;
+
+  fill(255, 255, 255, 55);
+  ellipse(width * 0.32 + driftA, height * 0.22, width * 0.9, height * 0.28);
+  ellipse(width * 0.7 + driftB, height * 0.52, width * 0.95, height * 0.34);
+  ellipse(width * 0.45 - driftA, height * 0.82, width * 0.88, height * 0.24);
+
+  drawingContext.filter = "none";
+  pop();
 }
 
 function draw() {
@@ -216,7 +238,7 @@ function draw() {
       loadPixels();
       const sourcePixels = pixels.slice();
 
-      const waveAmount = window.innerWidth <= 460 ? 10 : 20;
+      const waveAmount = window.innerWidth <= MOBILE_BREAKPOINT ? 10 : 20;
 
       for (let y = 0; y < height; y++) {
         const wave = map(
@@ -492,7 +514,6 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   const humidity = data?.current?.relative_humidity_2m ?? "-";
   const precipitation = data?.current?.precipitation ?? "-";
   const wind = data?.current?.wind_speed_10m ?? "-";
-  
 
   document.getElementById("weather").innerHTML = `
     <p>Location: ${cityLabel}</p>
@@ -780,7 +801,6 @@ if (captureBtn) {
     captureButton.style.visibility = "hidden";
 
     const target = document.getElementById("captureArea");
-
     const bg = getComputedStyle(document.body).backgroundColor;
 
     const canvas = await html2canvas(target, {
