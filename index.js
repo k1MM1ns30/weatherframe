@@ -1,4 +1,7 @@
 const MOBILE_BREAKPOINT = 460;
+const FORCE_MOBILE_CAMERA = true;
+const MOBILE_CAMERA_ZOOM = 1;
+
 
 const cityCoordinates = {
   "New York": { lat: 40.7128, lon: -74.0060, label: "New York" },
@@ -55,60 +58,53 @@ function getFrameSize() {
 
 function setup() {
   const { frameWidth, frameHeight } = getFrameSize();
-  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
 
   const canvas = createCanvas(frameWidth, frameHeight);
   canvas.parent("p5-container");
 
-  const mobileConstraints = {
-    video: {
-      facingMode: { ideal: "user" },
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      aspectRatio: { ideal: 16 / 9 },
-      frameRate: { ideal: 30, max: 30 },
-      resizeMode: "none"
-    },
-    audio: false
-  };
-
-  const desktopConstraints = {
-    video: true,
-    audio: false
-  };
-
-  cam = createCapture(
-    isMobile ? mobileConstraints : desktopConstraints,
-    () => {
-      if (!cam || !cam.elt) return;
-
-      const markCameraReady = () => {
-        if (cam.elt.videoWidth > 0 && cam.elt.videoHeight > 0) {
-          cameraReady = true;
-        }
+  const cameraConstraints = FORCE_MOBILE_CAMERA
+    ? {
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          aspectRatio: { ideal: 16 / 9 },
+          frameRate: { ideal: 30, max: 30 },
+          resizeMode: "none"
+        },
+        audio: false
+      }
+    : {
+        video: true,
+        audio: false
       };
 
-      cam.elt.setAttribute("playsinline", "");
-      cam.elt.setAttribute("autoplay", "");
-      cam.elt.setAttribute("muted", "");
+  cam = createCapture(cameraConstraints, () => {
+    if (!cam || !cam.elt) return;
 
-      cam.elt.playsInline = true;
-      cam.elt.muted = true;
+    const markCameraReady = () => {
+      if (cam.elt.videoWidth > 0 && cam.elt.videoHeight > 0) {
+        cameraReady = true;
+      }
+    };
 
-      cam.elt.addEventListener("loadedmetadata", markCameraReady);
-      cam.elt.addEventListener("playing", markCameraReady);
+    cam.elt.setAttribute("playsinline", "");
+    cam.elt.setAttribute("autoplay", "");
+    cam.elt.setAttribute("muted", "");
 
-      markCameraReady();
-    }
-  );
+    cam.elt.playsInline = true;
+    cam.elt.muted = true;
 
-  if (!isMobile) {
-    cam.size(640, 480);
-  }
+    cam.elt.addEventListener("loadedmetadata", markCameraReady);
+    cam.elt.addEventListener("playing", markCameraReady);
+
+    markCameraReady();
+  });
 
   cam.hide();
   pixelDensity(1);
 }
+
 
 
 function windowResized() {
@@ -117,15 +113,8 @@ function windowResized() {
 }
 
 function drawCameraCover(videoSource) {
-  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
-
-  const srcW = isMobile
-    ? (videoSource.elt?.videoWidth || videoSource.width)
-    : (videoSource.width || videoSource.elt?.videoWidth);
-
-  const srcH = isMobile
-    ? (videoSource.elt?.videoHeight || videoSource.height)
-    : (videoSource.height || videoSource.elt?.videoHeight);
+  const srcW = videoSource.elt?.videoWidth || videoSource.width;
+  const srcH = videoSource.elt?.videoHeight || videoSource.height;
 
   if (!srcW || !srcH) return;
 
@@ -152,11 +141,9 @@ function drawCameraCover(videoSource) {
     sy = (srcH - sh) / 2;
   }
 
-  // 모바일에서만 살짝 크롭해서 광각 느낌 줄이기
-  if (isMobile) {
-    const zoomFactor = 1.18;
-    const zoomedSw = sw / zoomFactor;
-    const zoomedSh = sh / zoomFactor;
+  if (FORCE_MOBILE_CAMERA) {
+    const zoomedSw = sw / MOBILE_CAMERA_ZOOM;
+    const zoomedSh = sh / MOBILE_CAMERA_ZOOM;
     sx += (sw - zoomedSw) / 2;
     sy += (sh - zoomedSh) / 2;
     sw = zoomedSw;
@@ -165,6 +152,7 @@ function drawCameraCover(videoSource) {
 
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
+
 
 
 
