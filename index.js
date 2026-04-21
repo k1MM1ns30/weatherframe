@@ -62,7 +62,12 @@ function setup() {
   cam = createCapture(
     {
       video: {
-        facingMode: "user"
+        facingMode: { ideal: "user" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        aspectRatio: { ideal: 16 / 9 },
+        frameRate: { ideal: 30, max: 30 },
+        resizeMode: "none"
       },
       audio: false
     },
@@ -88,6 +93,7 @@ function setup() {
       markCameraReady();
     }
   );
+
 
   if (window.innerWidth > MOBILE_BREAKPOINT) {
     cam.size(640, 480);
@@ -131,8 +137,21 @@ function drawCameraCover(videoSource) {
     sy = (srcH - sh) / 2;
   }
 
+  const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+  const zoomFactor = isMobile ? 1.18 : 1;
+
+  if (zoomFactor > 1) {
+    const zoomedSw = sw / zoomFactor;
+    const zoomedSh = sh / zoomFactor;
+    sx += (sw - zoomedSw) / 2;
+    sy += (sh - zoomedSh) / 2;
+    sw = zoomedSw;
+    sh = zoomedSh;
+  }
+
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
+
 
 function drawCloudyWhiteOverlay() {
   push();
@@ -238,7 +257,10 @@ function draw() {
       loadPixels();
       const sourcePixels = pixels.slice();
 
-      const waveAmount = window.innerWidth <= MOBILE_BREAKPOINT ? 10 : 20;
+      const waveAmount = window.innerWidth <= MOBILE_BREAKPOINT
+      ? Math.round(width * 0.05)
+      : Math.round(width * 0.06);
+
 
       for (let y = 0; y < height; y++) {
         const wave = map(
