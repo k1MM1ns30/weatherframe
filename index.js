@@ -223,17 +223,7 @@ function drawFogPixelated(videoSource) {
     rect(0, y, width, 1);
   }
 
-  drawingContext.filter = "blur(20px)";
 
-  const driftA = sin(frameCount * 0.01) * width * 0.04;
-  const driftB = cos(frameCount * 0.008) * width * 0.05;
-
-  fill(255, 255, 255, 55);
-  ellipse(width * 0.32 + driftA, height * 0.22, width * 0.9, height * 0.28);
-  ellipse(width * 0.7 + driftB, height * 0.52, width * 0.95, height * 0.34);
-  ellipse(width * 0.45 - driftA, height * 0.82, width * 0.88, height * 0.24);
-
-  drawingContext.filter = "none";
   pop();
 }
 
