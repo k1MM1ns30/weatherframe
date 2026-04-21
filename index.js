@@ -54,7 +54,9 @@ function setup() {
   canvas.parent("p5-container");
 
   cam = createCapture(VIDEO);
-  cam.size(640, 480);
+  if (window.innerWidth > 460) {
+    cam.size(640, 480);
+  }
   cam.hide();
 
   pixelDensity(1);
@@ -72,10 +74,20 @@ function windowResized() {
 }
 
 function drawCameraCover(videoSource) {
-  const srcW = videoSource.width;
-  const srcH = videoSource.height;
+  const isMobile = window.innerWidth <= 460;
+
+  const srcW = isMobile
+    ? (videoSource.elt.videoWidth || videoSource.width)
+    : videoSource.width;
+
+  const srcH = isMobile
+    ? (videoSource.elt.videoHeight || videoSource.height)
+    : videoSource.height;
+
   const destW = width;
   const destH = height;
+
+  if (!srcW || !srcH) return;
 
   const srcRatio = srcW / srcH;
   const destRatio = destW / destH;
@@ -118,11 +130,21 @@ function drawCloudyWhiteOverlay() {
   pop();
 }
 
-function drawFogPixelated(videoSource) {
-  const srcW = videoSource.width;
-  const srcH = videoSource.height;
+function drawCameraCover(videoSource) {
+  const isMobile = window.innerWidth <= 460;
+
+  const srcW = isMobile
+    ? (videoSource.elt.videoWidth || videoSource.width)
+    : videoSource.width;
+
+  const srcH = isMobile
+    ? (videoSource.elt.videoHeight || videoSource.height)
+    : videoSource.height;
+
   const destW = width;
   const destH = height;
+
+  if (!srcW || !srcH) return;
 
   const srcRatio = srcW / srcH;
   const destRatio = destW / destH;
@@ -141,29 +163,7 @@ function drawFogPixelated(videoSource) {
     sy = (srcH - sh) / 2;
   }
 
-  const blockSize = window.innerWidth <= 460 ? 12 : 10;
-
-  videoSource.loadPixels();
-  noStroke();
-
-  for (let y = 0; y < destH; y += blockSize) {
-    for (let x = 0; x < destW; x += blockSize) {
-      const sampleX = floor(map(x, 0, destW, sx, sx + sw - 1));
-      const sampleY = floor(map(y, 0, destH, sy, sy + sh - 1));
-
-      const index = (sampleX + sampleY * srcW) * 4;
-
-      const r = videoSource.pixels[index];
-      const g = videoSource.pixels[index + 1];
-      const b = videoSource.pixels[index + 2];
-
-      fill(r, g, b, 220);
-      rect(x, y, blockSize, blockSize);
-    }
-  }
-
-  fill(255, 255, 255, 35);
-  rect(0, 0, width, height);
+  image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
 }
 
 function draw() {
