@@ -36,13 +36,6 @@ body {
   position: relative;
 }
 
-/* 실제 카메라 */
-/* #camera {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1); /* 좌우 반전 
-} */
 
 /* 텍스트 (아래로 내림) */
 .info {
@@ -78,7 +71,7 @@ body {
   border-radius: 50%;
   z-index: -1;
   pointer-events: none;
-  filter: blur(5);
+  filter: blur(5px);
 
   background: radial-gradient(
     circle,
@@ -86,8 +79,7 @@ body {
     rgba(255,255,255,0.35) 35%,
     rgba(255, 255, 255, 0.289) 45%,
     rgba(255, 255, 255, 0.185) 60%,
-    rgba(255, 255, 255, 0.078) 70%,
-    
+    rgba(255, 255, 255, 0.078) 70%
   );
 }
 
@@ -156,6 +148,15 @@ body {
   cursor: pointer;
 }
 
+.city-btn:hover {
+  background: rgba(0,0,0,0.1);
+}
+
+.city-btn.active {
+  background: black;
+  color: white;
+}
+
 
 /* =========================
    🌟 필터 버튼 (왼쪽 아래, 지도와 대칭)
@@ -212,7 +213,137 @@ body {
   cursor: pointer;
 }
 
+.filter-btn:hover {
+  background: rgba(0,0,0,0.1);
+}
+
 .filter-btn.active {
   background: black;
   color: white;
+}
+
+.city-btn:active,
+.filter-btn:active {
+  background: rgba(0,0,0,0.2);
+}
+
+
+@media (max-width: 460px) {
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+    .canvas {
+    justify-content: flex-start; /* ← center → flex-start */
+    padding-top: 20px;
+    
+  }
+
+  .weather-emoji {
+    margin-bottom: 16px;
+    font-size: 35px;
+  }
+
+  .weather-emoji::before {
+    width: 90px;
+    height: 90px;
+  }
+
+  .camera-frame {
+    width: 95vw;
+    height: calc(95vw * 1.3125);
+  }
+
+  #p5-container {
+    width: 100%;
+    height: 100%;
+  }
+
+  #p5-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  .info {
+    width: 92vw;
+    margin-top: 18px;
+    font-size: 17px; /* 15 → 0.8배 */
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .info p {
+    margin: 8px 0;
+  }
+
+  #captureBtn {
+    width: 72px;
+    height: 72px;
+    margin-top: 18px;
+    font-size: 12px;
+    border-radius: 50%;
+  }
+
+    .city-wrapper {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    align-items: flex-end;
+    flex-direction: column-reverse;
+  }
+
+  .filter-wrapper {
+    position: fixed;
+    left: 12px;
+    bottom: 12px;
+    align-items: flex-start;
+    flex-direction: column-reverse;
+  }
+
+  .city-buttons,
+  .filter-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .city-buttons {
+    margin-right: 0;
+    margin-bottom: 8px;
+    transform: translateY(16px);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .city-buttons.active {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .filter-buttons {
+    margin-left: 0;
+    margin-bottom: 8px;
+    transform: translateY(16px);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .filter-buttons.active {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

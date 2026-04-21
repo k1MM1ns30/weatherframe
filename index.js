@@ -1,3 +1,7 @@
+
+window.innerWidth
+document.documentElement.clientWidth
+
 const cityCoordinates = {
   "New York": { lat: 40.7128, lon: -74.0060, label: "New York" },
   "Tokyo": { lat: 35.6762, lon: 139.6503, label: "Tokyo" },
@@ -38,7 +42,14 @@ let manualFilterType = null;
 let activeCityName = null;
 
 function setup() {
-  const canvas = createCanvas(320, 420);
+  const rawFrameWidth = window.innerWidth <= 460
+    ? window.innerWidth * 0.95
+    : Math.min(window.innerWidth * 0.82, 320);
+
+  const frameWidth = Math.round(rawFrameWidth);
+  const frameHeight = Math.round(frameWidth * 1.3125);
+
+  const canvas = createCanvas(frameWidth, frameHeight);
   canvas.parent("p5-container");
 
   cam = createCapture(VIDEO);
@@ -46,6 +57,17 @@ function setup() {
   cam.hide();
 
   pixelDensity(1);
+}
+
+function windowResized() {
+  const rawFrameWidth = window.innerWidth <= 460
+    ? window.innerWidth * 0.95
+    : Math.min(window.innerWidth * 0.82, 320);
+
+  const frameWidth = Math.round(rawFrameWidth);
+  const frameHeight = Math.round(frameWidth * 1.3125);
+
+  resizeCanvas(frameWidth, frameHeight);
 }
 
 function drawCameraCover(videoSource) {
@@ -100,70 +122,70 @@ function draw() {
 
   drawCameraCover(cam);
 
-
   if (hotEffectOn) {
-    loadPixels();
+  loadPixels();
+  const sourcePixels = pixels.slice();
 
-    const sourcePixels = pixels.slice();
+  const waveAmount = window.innerWidth <= 460 ? 10 : 20;
 
-    for (let y = 0; y < height; y++) {
-      const wave = map(
-        noise(y * 0.005, frameCount * 0.01),
-        0, 1,
-        -20, 20
-      );
+  for (let y = 0; y < height; y++) {
+    const wave = map(
+      noise(y * 0.005, frameCount * 0.01),
+      0, 1,
+      -waveAmount, waveAmount
+    );
 
-      for (let x = 0; x < width; x++) {
-        const index = (x + y * width) * 4;
+    for (let x = 0; x < width; x++) {
+      const index = (x + y * width) * 4;
 
-        let shiftedY = floor(y + wave);
-        shiftedY = constrain(shiftedY, 0, height - 1);
+      let shiftedY = floor(y + wave);
+      shiftedY = constrain(shiftedY, 0, height - 1);
 
-        const shiftedIndex = (x + shiftedY * width) * 4;
+      const shiftedIndex = (x + shiftedY * width) * 4;
 
-        pixels[index] = sourcePixels[shiftedIndex];
-        pixels[index + 1] = sourcePixels[shiftedIndex + 1];
-        pixels[index + 2] = sourcePixels[shiftedIndex + 2];
-        pixels[index + 3] = sourcePixels[shiftedIndex + 3];
-      }
+      pixels[index] = sourcePixels[shiftedIndex];
+      pixels[index + 1] = sourcePixels[shiftedIndex + 1];
+      pixels[index + 2] = sourcePixels[shiftedIndex + 2];
+      pixels[index + 3] = sourcePixels[shiftedIndex + 3];
     }
-
-    updatePixels();
-    } else if (cloudyEffectOn) {
-    loadPixels();
-    const sourcePixels = pixels.slice();
-
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        const index = (x + y * width) * 4;
-
-        let totalR = -2;
-        let totalG = -2;
-        let totalB = -2;
-        let count = 0.5;
-
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const i = ((x + dx) + (y + dy) * width) * 4;
-            totalR += sourcePixels[i];
-            totalG += sourcePixels[i + 1];
-            totalB += sourcePixels[i + 2];
-            count++;
-          }
-        }
-
-        pixels[index] = min((totalR / count) * 1.3, 255);
-        pixels[index + 1] = min((totalG / count) * 1.33, 255);
-        pixels[index + 2] = min((totalB / count) * 1.45, 255);
-        pixels[index + 3] = 255;
-      }
-    }
-
-    updatePixels();
-    drawCloudyWhiteOverlay();
   }
 
-  // ❄️ snow filter overlay
+  updatePixels();
+
+  } else if (cloudyEffectOn) {
+  loadPixels();
+  const sourcePixels = pixels.slice();
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const index = (x + y * width) * 4;
+
+      let totalR = -2;
+      let totalG = -2;
+      let totalB = -2;
+      let count = 0.5;
+
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const i = ((x + dx) + (y + dy) * width) * 4;
+          totalR += sourcePixels[i];
+          totalG += sourcePixels[i + 1];
+          totalB += sourcePixels[i + 2];
+          count++;
+        }
+      }
+
+      pixels[index] = min((totalR / count) * 1.3, 255);
+      pixels[index + 1] = min((totalG / count) * 1.33, 255);
+      pixels[index + 2] = min((totalB / count) * 1.45, 255);
+      pixels[index + 3] = 255;
+    }
+  }
+
+  updatePixels();
+  drawCloudyWhiteOverlay();
+}
+
   if (snowEffectOn) {
     if (frameCount % 4 === 0) {
       glitterParticles.push(new FallingGlitter());
