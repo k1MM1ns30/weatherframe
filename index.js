@@ -223,9 +223,9 @@ function drawFogPixelated(videoSource) {
     rect(0, y, width, 1);
   }
 
-
   pop();
 }
+
 
 function draw() {
   if (!cam) return;
