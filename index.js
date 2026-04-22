@@ -18,6 +18,7 @@ const cityCoordinates = {
 let cam;
 let cameraReady = false;
 
+
 let hotEffectOn = false;
 let cloudyEffectOn = false;
 let fogEffectOn = false;
