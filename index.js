@@ -1255,8 +1255,26 @@ async function searchTypedLocation() {
       return;
     }
 
-    const lat = parseFloat(data[0].lat);
-    const lon = parseFloat(data[0].lon);
+    const result = data[0];
+
+    // 실제 지명인지 검증: class/type/importance 체크
+    const validClasses = ['place', 'boundary'];
+    const validTypes = [
+      'city', 'town', 'village', 'suburb', 'hamlet',
+      'municipality', 'county', 'state', 'country', 'administrative', 'region'
+    ];
+    const isValidPlace =
+      validClasses.includes(result.class) &&
+      (validTypes.includes(result.type) || result.class === 'boundary') &&
+      parseFloat(result.importance) >= 0.25;
+
+    if (!isValidPlace) {
+      document.getElementById('weather').textContent = 'Location not found';
+      return;
+    }
+
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
 
     activeCityName = null;
     manualFilterType = null;

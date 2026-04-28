@@ -254,7 +254,8 @@ body {
 .location-modal-box {
   background: white;
   padding: 24px 20px;
-  border-radius: 14px;
+  border-radius: 0;
+  border: 1px solid black;
   width: min(80vw, 300px);
   display: flex;
   flex-direction: column;
@@ -276,7 +277,7 @@ body {
   font-size: 15px;
   font-family: Arial, sans-serif;
   border: 1px solid #ccc;
-  border-radius: 8px;
+  border-radius: 0;
   box-sizing: border-box;
   outline: none;
 }
@@ -295,7 +296,7 @@ body {
   padding: 10px;
   font-size: 13px;
   font-family: Arial, sans-serif;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   border: 1px solid black;
 }
