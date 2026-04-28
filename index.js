@@ -5,11 +5,61 @@ const MOBILE_CAMERA_ZOOM = 1;
 
 const cityCoordinates = {
   "New York": { lat: 40.7128, lon: -74.0060, label: "New York" },
-  "Tokyo": { lat: 35.6762, lon: 139.6503, label: "Tokyo" },
-  "Seoul": { lat: 37.5665, lon: 126.9780, label: "Seoul" },
-  "Okinawa": { lat: 26.2124, lon: 127.6809, label: "Okinawa" },
-  "London": { lat: 51.5072, lon: -0.1276, label: "London" },
-  "Sydney": { lat: -33.8688, lon: 151.2093, label: "Australia" }
+  "Tokyo":    { lat: 35.6762, lon: 139.6503, label: "Tokyo" },
+  "Seoul":    { lat: 37.5665, lon: 126.9780, label: "Seoul" },
+  "Okinawa":  { lat: 26.2124, lon: 127.6809, label: "Okinawa" },
+  "London":   { lat: 51.5072, lon: -0.1276,  label: "London" },
+  "Sydney":   { lat: -33.8688, lon: 151.2093, label: "Australia" },
+  // 추가 도시
+  "Paris":    { lat: 48.8566, lon: 2.3522,   label: "Paris" },
+  "Berlin":   { lat: 52.5200, lon: 13.4050,  label: "Berlin" },
+  "Beijing":  { lat: 39.9042, lon: 116.4074, label: "Beijing" },
+  "Shanghai": { lat: 31.2304, lon: 121.4737, label: "Shanghai" },
+  "Busan":    { lat: 35.1796, lon: 129.0756, label: "Busan" },
+  "Osaka":    { lat: 34.6937, lon: 135.5023, label: "Osaka" },
+  "Bangkok":  { lat: 13.7563, lon: 100.5018, label: "Bangkok" },
+  "Singapore":{ lat: 1.3521,  lon: 103.8198, label: "Singapore" },
+  "Dubai":    { lat: 25.2048, lon: 55.2708,  label: "Dubai" },
+  "Chicago":  { lat: 41.8781, lon: -87.6298, label: "Chicago" },
+  "Los Angeles":{ lat: 34.0522, lon: -118.2437, label: "Los Angeles" },
+};
+
+// 도시 별칭 테이블 (소문자 → cityCoordinates 키)
+const cityAliases = {
+  // New York
+  "new york": "New York", "뉴욕": "New York", "ニューヨーク": "New York",
+  // Tokyo
+  "tokyo": "Tokyo", "도쿄": "Tokyo", "東京": "Tokyo", "とうきょう": "Tokyo",
+  // Seoul
+  "seoul": "Seoul", "서울": "Seoul", "ソウル": "Seoul",
+  // Okinawa
+  "okinawa": "Okinawa", "오키나와": "Okinawa", "沖縄": "Okinawa", "おきなわ": "Okinawa",
+  // London
+  "london": "London", "런던": "London", "ロンドン": "London",
+  // Sydney
+  "sydney": "Sydney", "시드니": "Sydney", "シドニー": "Sydney", "australia": "Sydney",
+  // Paris
+  "paris": "Paris", "파리": "Paris", "パリ": "Paris",
+  // Berlin
+  "berlin": "Berlin", "베를린": "Berlin", "ベルリン": "Berlin",
+  // Beijing
+  "beijing": "Beijing", "peking": "Beijing", "베이징": "Beijing", "北京": "Beijing",
+  // Shanghai
+  "shanghai": "Shanghai", "상하이": "Shanghai", "上海": "Shanghai",
+  // Busan
+  "busan": "Busan", "부산": "Busan", "釜山": "Busan", "プサン": "Busan",
+  // Osaka
+  "osaka": "Osaka", "오사카": "Osaka", "大阪": "Osaka", "おおさか": "Osaka",
+  // Bangkok
+  "bangkok": "Bangkok", "방콕": "Bangkok", "バンコク": "Bangkok",
+  // Singapore
+  "singapore": "Singapore", "싱가포르": "Singapore", "シンガポール": "Singapore",
+  // Dubai
+  "dubai": "Dubai", "두바이": "Dubai", "ドバイ": "Dubai",
+  // Chicago
+  "chicago": "Chicago", "시카고": "Chicago", "シカゴ": "Chicago",
+  // Los Angeles
+  "los angeles": "Los Angeles", "la": "Los Angeles", "로스앤젤레스": "Los Angeles", "엘에이": "Los Angeles", "ロサンゼルス": "Los Angeles",
 };
 
 // =========================
@@ -461,21 +511,14 @@ function initSunny() {
   const cols = 5;
   const rows = 5;
   const cellW = width / cols;
-  const cellHTop = (halfH - 16) / rows;
   const cellHBot = (halfH - 16) / rows;
 
-  // 상단: 5x5 그리드에 랜덤 오프셋
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      sunnyStars.push({
-        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
-        y: 8 + row * cellHTop + random(cellHTop * 0.1, cellHTop * 0.9),
-        r: random(7, 18)
-      });
-    }
+  // random 시퀀스 소비 (상단용 - 버림)
+  for (let i = 0; i < rows * cols; i++) {
+    random(); random(); random();
   }
 
-  // 하단: 5x5 그리드에 랜덤 오프셋
+  // 하단: 5x5 그리드에 랜덤 오프셋 (위치 고정)
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       sunnyStars.push({
@@ -485,6 +528,11 @@ function initSunny() {
       });
     }
   }
+
+  // 상단: 하단 별을 먼저 복사한 뒤 y를 위쪽으로 이동
+  const bottomCopy = sunnyStars.slice();
+  const topStars = bottomCopy.map(s => ({ x: s.x, y: s.y - halfH, r: s.r }));
+  sunnyStars = [...topStars, ...bottomCopy];
 
   // 민트 3개 (하단 인덱스: 26, 37, 43)
   sunnyStars[26].col = 'mint';
@@ -1144,6 +1192,83 @@ filterButtons.forEach(button => {
 
 updateFilterButtonState();
 updateCityButtonState();
+
+// =========================
+// type my location
+// =========================
+const typeLocationBtn  = document.getElementById('typeLocationBtn');
+const locationModal    = document.getElementById('locationModal');
+const locationInput    = document.getElementById('locationInput');
+const locationConfirm  = document.getElementById('locationConfirmBtn');
+const locationCancel   = document.getElementById('locationCancelBtn');
+
+typeLocationBtn.addEventListener('click', () => {
+  cityButtonsWrap.classList.remove('active');
+  locationInput.value = '';
+  locationModal.classList.remove('hidden');
+  setTimeout(() => locationInput.focus(), 50);
+});
+
+locationCancel.addEventListener('click', () => {
+  locationModal.classList.add('hidden');
+});
+
+locationModal.addEventListener('click', (e) => {
+  if (e.target === locationModal) locationModal.classList.add('hidden');
+});
+
+locationInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') searchTypedLocation();
+});
+
+locationConfirm.addEventListener('click', searchTypedLocation);
+
+async function searchTypedLocation() {
+  const query = locationInput.value.trim();
+  if (!query) return;
+
+  locationModal.classList.add('hidden');
+  document.getElementById('weather').textContent = 'Searching...';
+
+  // 1. 별칭 테이블 먼저 체크
+  const key = cityAliases[query.toLowerCase()];
+  if (key && cityCoordinates[key]) {
+    const city = cityCoordinates[key];
+    activeCityName = null;
+    manualFilterType = null;
+    updateCityButtonState();
+    updateFilterButtonState();
+    loadWeather(city.lat, city.lon, city.label);
+    return;
+  }
+
+  // 2. 테이블에 없으면 Nominatim으로 fallback
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await res.json();
+
+    if (!data || data.length === 0) {
+      document.getElementById('weather').textContent = 'Location not found';
+      return;
+    }
+
+    const lat = parseFloat(data[0].lat);
+    const lon = parseFloat(data[0].lon);
+
+    activeCityName = null;
+    manualFilterType = null;
+    updateCityButtonState();
+    updateFilterButtonState();
+
+    loadWeather(lat, lon, query);
+  } catch (err) {
+    console.error('Geocode error:', err);
+    document.getElementById('weather').textContent = 'Failed to find location';
+  }
+}
 
 // =========================
 // capture button

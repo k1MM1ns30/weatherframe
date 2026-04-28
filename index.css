@@ -237,6 +237,79 @@ body {
 }
 
 
+.location-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.location-modal.hidden {
+  display: none;
+}
+
+.location-modal-box {
+  background: white;
+  padding: 24px 20px;
+  border-radius: 14px;
+  width: min(80vw, 300px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+.location-modal-box p {
+  margin: 0;
+  font-size: 15px;
+  font-weight: normal;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+
+#locationInput {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: Arial, sans-serif;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+#locationInput:focus {
+  border-color: black;
+}
+
+.location-modal-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.location-modal-btns button {
+  flex: 1;
+  padding: 10px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid black;
+}
+
+#locationConfirmBtn {
+  background: black;
+  color: white;
+}
+
+#locationCancelBtn {
+  background: white;
+  color: black;
+}
+
 @media (max-width: 460px) {
   html, body {
     margin: 0;
