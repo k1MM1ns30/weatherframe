@@ -25,6 +25,11 @@ let fogEffectOn = false;
 let snowEffectOn = false;
 let rainEffectOn = false;
 let coldEffectOn = false;
+let windEffectOn = false;
+
+let windOrder = [];
+let windTimer = 0;
+let windOffscreen = null;
 
 const RAIN_BUFFER_MAX = 30;
 let rainFrameBuffer = [];
@@ -256,6 +261,9 @@ function draw() {
 
   } else if (coldEffectOn) {
     drawColdFlowField();
+
+  } else if (windEffectOn) {
+    drawWindEffect();
 
   } else if (sunnyEffectOn) {
     drawSunnyEffect();
@@ -526,7 +534,8 @@ function getWeatherStyle(weatherType) {
         hotEffectOn: false,
         cloudyEffectOn: false,
         snowEffectOn: false,
-        fogEffectOn: false
+        fogEffectOn: false,
+        windEffectOn: true
       };
 
     case "cold":
@@ -602,6 +611,7 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   rainEffectOn = style.rainEffectOn ?? false;
   coldEffectOn = style.coldEffectOn ?? false;
   sunnyEffectOn = style.sunnyEffectOn ?? false;
+  windEffectOn = style.windEffectOn ?? false;
 
   console.log("weatherType:", weatherType, "| manualFilterType:", manualFilterType);
 }
@@ -629,6 +639,61 @@ function loadWeather(lat, lon, cityLabel) {
       console.error("Weather fetch error:", err);
       document.getElementById("weather").textContent = "Failed to load weather data";
     });
+}
+
+// =========================
+// wind: 20행 × 10열 격자 셔플
+// =========================
+const WIND_ROWS = 20;
+const WIND_COLS = 10;
+
+function shuffleWindOrder() {
+  const total = WIND_ROWS * WIND_COLS;
+  windOrder = Array.from({ length: total }, (_, i) => i);
+  for (let i = windOrder.length - 1; i > 0; i--) {
+    const j = floor(random(i + 1));
+    const tmp = windOrder[i];
+    windOrder[i] = windOrder[j];
+    windOrder[j] = tmp;
+  }
+}
+
+function drawWindEffect() {
+  if (windOrder.length === 0) shuffleWindOrder();
+
+  windTimer++;
+  if (windTimer >= 15) {
+    windTimer = 0;
+    shuffleWindOrder();
+  }
+
+  drawCameraCover(cam);
+
+  const ctx = drawingContext;
+  const canvas = ctx.canvas;
+  const cellW = width  / WIND_COLS;
+  const cellH = height / WIND_ROWS;
+
+  if (!windOffscreen || windOffscreen.width !== width || windOffscreen.height !== height) {
+    windOffscreen = document.createElement('canvas');
+  }
+  windOffscreen.width = width;
+  windOffscreen.height = height;
+  windOffscreen.getContext('2d').drawImage(canvas, 0, 0);
+
+  for (let i = 0; i < WIND_ROWS * WIND_COLS; i++) {
+    const srcIdx = windOrder[i];
+    const srcRow = floor(srcIdx / WIND_COLS);
+    const srcCol = srcIdx % WIND_COLS;
+    const dstRow = floor(i / WIND_COLS);
+    const dstCol = i % WIND_COLS;
+
+    ctx.drawImage(
+      windOffscreen,
+      srcCol * cellW, srcRow * cellH, cellW, cellH,
+      dstCol * cellW, dstRow * cellH, cellW, cellH
+    );
+  }
 }
 
 // =========================
