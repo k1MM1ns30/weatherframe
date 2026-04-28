@@ -396,6 +396,399 @@ function draw() {
 
 }
 
+function drawWindEffect() {
+  if (windOrder.length === 0) shuffleWindOrder();
+
+  windTimer++;
+  if (windTimer >= 15) {
+    windTimer = 0;
+    shuffleWindOrder();
+  }
+
+  drawCameraCover(cam);
+
+  const ctx = drawingContext;
+  const canvas = ctx.canvas;
+  const cellW = width  / WIND_COLS;
+  const cellH = height / WIND_ROWS;
+
+  if (!windOffscreen || windOffscreen.width !== width || windOffscreen.height !== height) {
+    windOffscreen = document.createElement('canvas');
+  }
+  windOffscreen.width = width;
+  windOffscreen.height = height;
+  windOffscreen.getContext('2d').drawImage(canvas, 0, 0);
+
+  for (let i = 0; i < WIND_ROWS * WIND_COLS; i++) {
+    const srcIdx = windOrder[i];
+    const srcRow = floor(srcIdx / WIND_COLS);
+    const srcCol = srcIdx % WIND_COLS;
+    const dstRow = floor(i / WIND_COLS);
+    const dstCol = i % WIND_COLS;
+
+    ctx.drawImage(
+      windOffscreen,
+      srcCol * cellW, srcRow * cellH, cellW, cellH,
+      dstCol * cellW, dstRow * cellH, cellW, cellH
+    );
+  }
+}
+
+// =========================
+// wind: 20행 × 10열 격자 셔플
+// =========================
+const WIND_ROWS = 20;
+const WIND_COLS = 10;
+
+function shuffleWindOrder() {
+  const total = WIND_ROWS * WIND_COLS;
+  windOrder = Array.from({ length: total }, (_, i) => i);
+  for (let i = windOrder.length - 1; i > 0; i--) {
+    const j = floor(random(i + 1));
+    const tmp = windOrder[i];
+    windOrder[i] = windOrder[j];
+    windOrder[j] = tmp;
+  }
+}
+
+// =========================
+// sunny: 2분할 별 마스크 효과
+// =========================
+function initSunny() {
+  randomSeed(42);
+  sunnyStars = [];
+  const halfH = height / 2;
+  const cols = 5;
+  const rows = 5;
+  const cellW = width / cols;
+  const cellHTop = (halfH - 16) / rows;
+  const cellHBot = (halfH - 16) / rows;
+
+  // 상단: 5x5 그리드에 랜덤 오프셋
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      sunnyStars.push({
+        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
+        y: 8 + row * cellHTop + random(cellHTop * 0.1, cellHTop * 0.9),
+        r: random(7, 18)
+      });
+    }
+  }
+
+  // 하단: 5x5 그리드에 랜덤 오프셋
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      sunnyStars.push({
+        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
+        y: halfH + 8 + row * cellHBot + random(cellHBot * 0.1, cellHBot * 0.9),
+        r: random(7, 18)
+      });
+    }
+  }
+
+  // 민트 3개 (하단 인덱스: 26, 37, 43)
+  sunnyStars[26].col = 'mint';
+  sunnyStars[37].col = 'mint';
+  sunnyStars[43].col = 'mint';
+  // 고동색 2개 (하단 인덱스: 31, 47)
+  sunnyStars[31].col = 'brown';
+  sunnyStars[47].col = 'brown';
+}
+
+function drawSunnyEffect() {
+  if (!sunnyStars) initSunny();
+
+  const halfH = height / 2;
+  const ctx = drawingContext;
+  const video = cam.elt;
+
+  if (!video || !video.videoWidth) {
+    drawCameraCover(cam);
+    return;
+  }
+
+  // 각 절반(width × halfH) 기준으로 crop 계산
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  const destRatio = width / halfH;
+  const srcRatio = srcW / srcH;
+  let sx, sy, sw, sh;
+  if (srcRatio > destRatio) {
+    sh = srcH; sw = srcH * destRatio;
+    sx = (srcW - sw) / 2; sy = 0;
+  } else {
+    sw = srcW; sh = srcW / destRatio;
+    sx = 0; sy = (srcH - sh) / 2;
+  }
+  if (FORCE_MOBILE_CAMERA) {
+    const zSw = sw / MOBILE_CAMERA_ZOOM;
+    const zSh = sh / MOBILE_CAMERA_ZOOM;
+    sx += (sw - zSw) / 2; sy += (sh - zSh) / 2;
+    sw = zSw; sh = zSh;
+  }
+
+  function makeStarPath(cx, cy, r) {
+    ctx.beginPath();
+    const inner = r * 0.42;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI / 5) - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : inner;
+      const px = cx + Math.cos(angle) * rad;
+      const py = cy + Math.sin(angle) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  // 상단: 흰 배경 + 별 clip 안에 카메라(상단 절반에 꽉 차게)
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, width, halfH);
+
+  for (const s of sunnyStars) {
+    if (s.y < halfH) {
+      ctx.save();
+      makeStarPath(s.x, s.y, s.r);
+      ctx.clip();
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, halfH);
+      ctx.restore();
+    }
+  }
+
+  // 하단: 카메라(하단 절반에 꽉 차게) + 별 도형
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, halfH, width, halfH);
+  ctx.clip();
+  ctx.drawImage(video, sx, sy, sw, sh, 0, halfH, width, halfH);
+  ctx.restore();
+
+  for (const s of sunnyStars) {
+    if (s.y >= halfH) {
+      if (s.col === 'mint')       ctx.fillStyle = 'rgb(152, 224, 210)';
+      else if (s.col === 'brown') ctx.fillStyle = 'rgb(90, 42, 18)';
+      else                        ctx.fillStyle = 'white';
+      makeStarPath(s.x, s.y, s.r);
+      ctx.fill();
+    }
+  }
+
+  // 분할선
+  ctx.strokeStyle = 'rgba(180,180,180,0.8)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, halfH);
+  ctx.lineTo(width, halfH);
+  ctx.stroke();
+}
+
+// =========================
+// cold: 2색 Bayer ordered dithering
+// =========================
+function drawColdFlowField() {
+  drawCameraCover(cam);
+  loadPixels();
+
+  const step = 6; // 블록 크기 (픽셀 아트 느낌)
+
+  // ↓ 두 색상만 여기서 조정 (HEX)
+  const dark  = '#3c9eff'; // 어두운 파랑
+  const light = '#81e1fc'; // 밝은 하늘색
+
+  const h = s => [parseInt(s.slice(1,3),16), parseInt(s.slice(3,5),16), parseInt(s.slice(5,7),16)];
+  const darkRgb  = h(dark);
+  const lightRgb = h(light);
+
+  // Bayer 4×4 ordered dithering matrix
+  const bayer = [
+    [ 0,  8,  2, 10],
+    [12,  4, 14,  6],
+    [ 3, 11,  1,  9],
+    [15,  7, 13,  5]
+  ];
+
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const ci = (y * width + x) * 4;
+      const brightness = 0.299 * pixels[ci] + 0.587 * pixels[ci + 1] + 0.114 * pixels[ci + 2];
+
+      const threshold = (bayer[floor(y / step) % 4][floor(x / step) % 4] / 15.0) * 255;
+      const c = brightness > threshold ? lightRgb : darkRgb;
+
+      for (let dy = 0; dy < step && y + dy < height; dy++) {
+        for (let dx = 0; dx < step && x + dx < width; dx++) {
+          const i = ((y + dy) * width + (x + dx)) * 4;
+          pixels[i]     = c[0];
+          pixels[i + 1] = c[1];
+          pixels[i + 2] = c[2];
+          pixels[i + 3] = 255;
+        }
+      }
+    }
+  }
+
+  updatePixels();
+}
+
+
+// =========================
+// rain slit scan
+// =========================
+function drawRainSlitScan() {
+  loadPixels();
+
+  rainFrameBuffer.push(pixels.slice());
+  if (rainFrameBuffer.length > RAIN_BUFFER_MAX) {
+    rainFrameBuffer.shift();
+  }
+
+  if (rainFrameBuffer.length < 2) {
+    updatePixels();
+    return;
+  }
+
+  const bufLen = rainFrameBuffer.length;
+
+  for (let x = 0; x < width; x++) {
+    const delay = floor(noise(x * 0.05, frameCount * 0.018) * (bufLen - 1));
+    const src = rainFrameBuffer[bufLen - 1 - delay];
+
+    for (let y = 0; y < height; y++) {
+      const i = (y * width + x) * 4;
+      const blueVal = src[i + 2] * 1.05 + 15;
+      pixels[i]     = src[i]     * 0.72;
+      pixels[i + 1] = src[i + 1] * 0.85;
+      pixels[i + 2] = blueVal > 255 ? 255 : blueVal;
+      pixels[i + 3] = 255;
+    }
+  }
+
+  updatePixels();
+}
+
+class FallingGlitter {
+  constructor() {
+    this.x = random(width);
+    this.y = random(-100, height * 0.3);
+
+    this.vx = random(-0.15, 0.15);
+    this.vy = random(1.2, 2.8);
+
+    this.size = random(5, 10);
+
+    this.color = color(random(snowPalette));
+
+    this.alphaBase = random(200, 255);
+    this.alpha = this.alphaBase;
+
+    this.twinkleSpeed = random(0.02, 0.06);
+    this.twinkleOffset = random(TWO_PI);
+
+    this.shapeType = floor(random(3));
+
+    this.seed = random(1000);
+    this.tailLength = random(20, 46);
+
+    this.clusterPoints = [];
+    if (this.shapeType === 2) {
+      let pointCount = floor(random(10, 15));
+      for (let i = 0; i < pointCount; i++) {
+        this.clusterPoints.push({
+          ox: randomGaussian(0, this.size * 0.55),
+          oy: randomGaussian(0, this.size * 0.55),
+          r: random(0.8, 1.5)
+        });
+      }
+    }
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.x += sin(frameCount * 0.025 + this.seed) * 0.06;
+
+    this.alpha =
+      this.alphaBase +
+      sin(frameCount * this.twinkleSpeed + this.twinkleOffset) * 35;
+  }
+
+  display() {
+    push();
+    translate(this.x, this.y);
+
+    const c = color(this.color);
+
+    if (this.shapeType === 0) {
+      drawingContext.shadowBlur = this.size * 1.2;
+      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
+
+      stroke(red(c), green(c), blue(c), this.alpha);
+      strokeWeight(1.1);
+
+      line(-this.size * 0.9, 0, this.size * 0.9, 0);
+      line(0, -this.size * 0.9, 0, this.size * 0.9);
+
+      line(-this.size * 0.42, -this.size * 0.42, this.size * 0.42, this.size * 0.42);
+      line(-this.size * 0.42, this.size * 0.42, this.size * 0.42, -this.size * 0.42);
+
+      noStroke();
+      fill(red(c), green(c), blue(c), this.alpha);
+      circle(0, 0, this.size * 0.22);
+
+    } else if (this.shapeType === 1) {
+      drawingContext.shadowBlur = this.tailLength * 0.1;
+      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
+
+      let segments = 4;
+      for (let i = 0; i < segments; i++) {
+        let t1 = i / segments;
+        let t2 = (i + 1) / segments;
+
+        let y1 = lerp(-this.tailLength, 0, t1);
+        let y2 = lerp(-this.tailLength, 0, t2);
+
+        let segAlpha = lerp(this.alpha * 0.12, this.alpha * 0.55, t2);
+        let segWeight = lerp(0.25, 1.35, t2);
+
+        stroke(red(c), green(c), blue(c), segAlpha);
+        strokeWeight(segWeight);
+        line(0, y1, 0, y2);
+      }
+
+      drawingContext.shadowBlur = this.size * 0.9;
+      stroke(red(c), green(c), blue(c), this.alpha);
+      strokeWeight(1);
+
+      line(-this.size * 0.55, 0, this.size * 0.55, 0);
+      line(0, -this.size * 0.55, 0, this.size * 0.55);
+
+      noStroke();
+      fill(red(c), green(c), blue(c), this.alpha);
+      circle(0, 0, this.size * 0.16);
+
+    } else if (this.shapeType === 2) {
+      noStroke();
+
+      for (let p of this.clusterPoints) {
+        let localAlpha = this.alpha * 0.85;
+
+        drawingContext.shadowBlur = p.r * 1.8;
+        drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${localAlpha / 255})`;
+
+        fill(red(c), green(c), blue(c), localAlpha);
+        circle(p.ox, p.oy, p.r);
+      }
+    }
+
+    pop();
+    drawingContext.shadowBlur = 0;
+  }
+
+  isOut() {
+    return this.y > height + this.tailLength + 20;
+  }
+}
+
 // =========================
 // location helpers
 // =========================
@@ -641,393 +1034,13 @@ function loadWeather(lat, lon, cityLabel) {
     });
 }
 
-// =========================
-// wind: 20행 × 10열 격자 셔플
-// =========================
-const WIND_ROWS = 20;
-const WIND_COLS = 10;
 
-function shuffleWindOrder() {
-  const total = WIND_ROWS * WIND_COLS;
-  windOrder = Array.from({ length: total }, (_, i) => i);
-  for (let i = windOrder.length - 1; i > 0; i--) {
-    const j = floor(random(i + 1));
-    const tmp = windOrder[i];
-    windOrder[i] = windOrder[j];
-    windOrder[j] = tmp;
-  }
-}
 
-function drawWindEffect() {
-  if (windOrder.length === 0) shuffleWindOrder();
 
-  windTimer++;
-  if (windTimer >= 15) {
-    windTimer = 0;
-    shuffleWindOrder();
-  }
 
-  drawCameraCover(cam);
 
-  const ctx = drawingContext;
-  const canvas = ctx.canvas;
-  const cellW = width  / WIND_COLS;
-  const cellH = height / WIND_ROWS;
 
-  if (!windOffscreen || windOffscreen.width !== width || windOffscreen.height !== height) {
-    windOffscreen = document.createElement('canvas');
-  }
-  windOffscreen.width = width;
-  windOffscreen.height = height;
-  windOffscreen.getContext('2d').drawImage(canvas, 0, 0);
 
-  for (let i = 0; i < WIND_ROWS * WIND_COLS; i++) {
-    const srcIdx = windOrder[i];
-    const srcRow = floor(srcIdx / WIND_COLS);
-    const srcCol = srcIdx % WIND_COLS;
-    const dstRow = floor(i / WIND_COLS);
-    const dstCol = i % WIND_COLS;
-
-    ctx.drawImage(
-      windOffscreen,
-      srcCol * cellW, srcRow * cellH, cellW, cellH,
-      dstCol * cellW, dstRow * cellH, cellW, cellH
-    );
-  }
-}
-
-// =========================
-// sunny: 2분할 별 마스크 효과
-// =========================
-function initSunny() {
-  randomSeed(42);
-  sunnyStars = [];
-  const halfH = height / 2;
-  const cols = 5;
-  const rows = 5;
-  const cellW = width / cols;
-  const cellHTop = (halfH - 16) / rows;
-  const cellHBot = (halfH - 16) / rows;
-
-  // 상단: 5x5 그리드에 랜덤 오프셋
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      sunnyStars.push({
-        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
-        y: 8 + row * cellHTop + random(cellHTop * 0.1, cellHTop * 0.9),
-        r: random(7, 18)
-      });
-    }
-  }
-
-  // 하단: 5x5 그리드에 랜덤 오프셋
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      sunnyStars.push({
-        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
-        y: halfH + 8 + row * cellHBot + random(cellHBot * 0.1, cellHBot * 0.9),
-        r: random(7, 18)
-      });
-    }
-  }
-
-  // 민트 3개 (하단 인덱스: 26, 37, 43)
-  sunnyStars[26].col = 'mint';
-  sunnyStars[37].col = 'mint';
-  sunnyStars[43].col = 'mint';
-  // 고동색 2개 (하단 인덱스: 31, 47)
-  sunnyStars[31].col = 'brown';
-  sunnyStars[47].col = 'brown';
-}
-
-function drawSunnyEffect() {
-  if (!sunnyStars) initSunny();
-
-  const halfH = height / 2;
-  const ctx = drawingContext;
-  const video = cam.elt;
-
-  if (!video || !video.videoWidth) {
-    drawCameraCover(cam);
-    return;
-  }
-
-  // 각 절반(width × halfH) 기준으로 crop 계산
-  const srcW = video.videoWidth;
-  const srcH = video.videoHeight;
-  const destRatio = width / halfH;
-  const srcRatio = srcW / srcH;
-  let sx, sy, sw, sh;
-  if (srcRatio > destRatio) {
-    sh = srcH; sw = srcH * destRatio;
-    sx = (srcW - sw) / 2; sy = 0;
-  } else {
-    sw = srcW; sh = srcW / destRatio;
-    sx = 0; sy = (srcH - sh) / 2;
-  }
-  if (FORCE_MOBILE_CAMERA) {
-    const zSw = sw / MOBILE_CAMERA_ZOOM;
-    const zSh = sh / MOBILE_CAMERA_ZOOM;
-    sx += (sw - zSw) / 2; sy += (sh - zSh) / 2;
-    sw = zSw; sh = zSh;
-  }
-
-  function makeStarPath(cx, cy, r) {
-    ctx.beginPath();
-    const inner = r * 0.42;
-    for (let i = 0; i < 10; i++) {
-      const angle = (i * Math.PI / 5) - Math.PI / 2;
-      const rad = i % 2 === 0 ? r : inner;
-      const px = cx + Math.cos(angle) * rad;
-      const py = cy + Math.sin(angle) * rad;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-  }
-
-  // 상단: 흰 배경 + 별 clip 안에 카메라(상단 절반에 꽉 차게)
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, width, halfH);
-
-  for (const s of sunnyStars) {
-    if (s.y < halfH) {
-      ctx.save();
-      makeStarPath(s.x, s.y, s.r);
-      ctx.clip();
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, halfH);
-      ctx.restore();
-    }
-  }
-
-  // 하단: 카메라(하단 절반에 꽉 차게) + 별 도형
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, halfH, width, halfH);
-  ctx.clip();
-  ctx.drawImage(video, sx, sy, sw, sh, 0, halfH, width, halfH);
-  ctx.restore();
-
-  for (const s of sunnyStars) {
-    if (s.y >= halfH) {
-      if (s.col === 'mint')       ctx.fillStyle = 'rgb(152, 224, 210)';
-      else if (s.col === 'brown') ctx.fillStyle = 'rgb(90, 42, 18)';
-      else                        ctx.fillStyle = 'white';
-      makeStarPath(s.x, s.y, s.r);
-      ctx.fill();
-    }
-  }
-
-  // 분할선
-  ctx.strokeStyle = 'rgba(180,180,180,0.8)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, halfH);
-  ctx.lineTo(width, halfH);
-  ctx.stroke();
-}
-
-// =========================
-// cold: 2색 Bayer ordered dithering
-// =========================
-function drawColdFlowField() {
-  drawCameraCover(cam);
-  loadPixels();
-
-  const step = 6; // 블록 크기 (픽셀 아트 느낌)
-
-  // ↓ 두 색상만 여기서 조정
-  const dark  = [15,  52, 120]; // 어두운 파랑
-  const light = [120, 200, 252]; // 밝은 하늘색
-
-  // Bayer 4×4 ordered dithering matrix
-  const bayer = [
-    [ 0,  8,  2, 10],
-    [12,  4, 14,  6],
-    [ 3, 11,  1,  9],
-    [15,  7, 13,  5]
-  ];
-
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const ci = (y * width + x) * 4;
-      const brightness = 0.299 * pixels[ci] + 0.587 * pixels[ci + 1] + 0.114 * pixels[ci + 2];
-
-      const threshold = (bayer[floor(y / step) % 4][floor(x / step) % 4] / 15.0) * 255;
-      const c = brightness > threshold ? light : dark;
-
-      for (let dy = 0; dy < step && y + dy < height; dy++) {
-        for (let dx = 0; dx < step && x + dx < width; dx++) {
-          const i = ((y + dy) * width + (x + dx)) * 4;
-          pixels[i]     = c[0];
-          pixels[i + 1] = c[1];
-          pixels[i + 2] = c[2];
-          pixels[i + 3] = 255;
-        }
-      }
-    }
-  }
-
-  updatePixels();
-}
-
-// =========================
-// rain slit scan
-// =========================
-function drawRainSlitScan() {
-  loadPixels();
-
-  rainFrameBuffer.push(pixels.slice());
-  if (rainFrameBuffer.length > RAIN_BUFFER_MAX) {
-    rainFrameBuffer.shift();
-  }
-
-  if (rainFrameBuffer.length < 2) {
-    updatePixels();
-    return;
-  }
-
-  const bufLen = rainFrameBuffer.length;
-
-  for (let x = 0; x < width; x++) {
-    const delay = floor(noise(x * 0.05, frameCount * 0.018) * (bufLen - 1));
-    const src = rainFrameBuffer[bufLen - 1 - delay];
-
-    for (let y = 0; y < height; y++) {
-      const i = (y * width + x) * 4;
-      const blueVal = src[i + 2] * 1.05 + 15;
-      pixels[i]     = src[i]     * 0.72;
-      pixels[i + 1] = src[i + 1] * 0.85;
-      pixels[i + 2] = blueVal > 255 ? 255 : blueVal;
-      pixels[i + 3] = 255;
-    }
-  }
-
-  updatePixels();
-}
-
-class FallingGlitter {
-  constructor() {
-    this.x = random(width);
-    this.y = random(-100, height * 0.3);
-
-    this.vx = random(-0.15, 0.15);
-    this.vy = random(1.2, 2.8);
-
-    this.size = random(5, 10);
-
-    this.color = color(random(snowPalette));
-
-    this.alphaBase = random(200, 255);
-    this.alpha = this.alphaBase;
-
-    this.twinkleSpeed = random(0.02, 0.06);
-    this.twinkleOffset = random(TWO_PI);
-
-    this.shapeType = floor(random(3));
-
-    this.seed = random(1000);
-    this.tailLength = random(20, 46);
-
-    this.clusterPoints = [];
-    if (this.shapeType === 2) {
-      let pointCount = floor(random(10, 15));
-      for (let i = 0; i < pointCount; i++) {
-        this.clusterPoints.push({
-          ox: randomGaussian(0, this.size * 0.55),
-          oy: randomGaussian(0, this.size * 0.55),
-          r: random(0.8, 1.5)
-        });
-      }
-    }
-  }
-
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.x += sin(frameCount * 0.025 + this.seed) * 0.06;
-
-    this.alpha =
-      this.alphaBase +
-      sin(frameCount * this.twinkleSpeed + this.twinkleOffset) * 35;
-  }
-
-  display() {
-    push();
-    translate(this.x, this.y);
-
-    const c = color(this.color);
-
-    if (this.shapeType === 0) {
-      drawingContext.shadowBlur = this.size * 1.2;
-      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
-
-      stroke(red(c), green(c), blue(c), this.alpha);
-      strokeWeight(1.1);
-
-      line(-this.size * 0.9, 0, this.size * 0.9, 0);
-      line(0, -this.size * 0.9, 0, this.size * 0.9);
-
-      line(-this.size * 0.42, -this.size * 0.42, this.size * 0.42, this.size * 0.42);
-      line(-this.size * 0.42, this.size * 0.42, this.size * 0.42, -this.size * 0.42);
-
-      noStroke();
-      fill(red(c), green(c), blue(c), this.alpha);
-      circle(0, 0, this.size * 0.22);
-
-    } else if (this.shapeType === 1) {
-      drawingContext.shadowBlur = this.tailLength * 0.1;
-      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
-
-      let segments = 4;
-      for (let i = 0; i < segments; i++) {
-        let t1 = i / segments;
-        let t2 = (i + 1) / segments;
-
-        let y1 = lerp(-this.tailLength, 0, t1);
-        let y2 = lerp(-this.tailLength, 0, t2);
-
-        let segAlpha = lerp(this.alpha * 0.12, this.alpha * 0.55, t2);
-        let segWeight = lerp(0.25, 1.35, t2);
-
-        stroke(red(c), green(c), blue(c), segAlpha);
-        strokeWeight(segWeight);
-        line(0, y1, 0, y2);
-      }
-
-      drawingContext.shadowBlur = this.size * 0.9;
-      stroke(red(c), green(c), blue(c), this.alpha);
-      strokeWeight(1);
-
-      line(-this.size * 0.55, 0, this.size * 0.55, 0);
-      line(0, -this.size * 0.55, 0, this.size * 0.55);
-
-      noStroke();
-      fill(red(c), green(c), blue(c), this.alpha);
-      circle(0, 0, this.size * 0.16);
-
-    } else if (this.shapeType === 2) {
-      noStroke();
-
-      for (let p of this.clusterPoints) {
-        let localAlpha = this.alpha * 0.85;
-
-        drawingContext.shadowBlur = p.r * 1.8;
-        drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${localAlpha / 255})`;
-
-        fill(red(c), green(c), blue(c), localAlpha);
-        circle(p.ox, p.oy, p.r);
-      }
-    }
-
-    pop();
-    drawingContext.shadowBlur = 0;
-  }
-
-  isOut() {
-    return this.y > height + this.tailLength + 20;
-  }
-}
 
 // =========================
 // initial load: current location
