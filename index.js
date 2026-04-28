@@ -563,7 +563,7 @@ function getWeatherStyle(weatherType) {
     case "sunny":
     default:
       return {
-        bgColor: "#FFD700",
+        bgColor: "#ffee8e",
         emoji: "☀️",
         hotEffectOn: false,
         cloudyEffectOn: false,
@@ -763,64 +763,47 @@ function drawSunnyEffect() {
 }
 
 // =========================
-// cold: 엣지 감지 → 세로선 렌더링
+// cold: 2색 Bayer ordered dithering
 // =========================
 function drawColdFlowField() {
   drawCameraCover(cam);
   loadPixels();
-  background(233, 238, 252);
 
-  const step           = 5;   // 샘플 간격
-  const edgeThreshold  = 105; // 엣지 감도
-  const darkThreshold  = 310; // 어두운 영역 감도 (R+G+B 합, 낮을수록 더 넓게 잡힘)
-  const t = frameCount * 0.016;
+  const step = 6; // 블록 크기 (픽셀 아트 느낌)
 
-  noStroke();
-  textAlign(CENTER, CENTER);
+  // ↓ 두 색상만 여기서 조정
+  const dark  = [15,  52, 120]; // 어두운 파랑
+  const light = [120, 200, 252]; // 밝은 하늘색
 
-  for (let y = step; y < height - step; y += step) {
-    for (let x = step; x < width - step; x += step) {
+  // Bayer 4×4 ordered dithering matrix
+  const bayer = [
+    [ 0,  8,  2, 10],
+    [12,  4, 14,  6],
+    [ 3, 11,  1,  9],
+    [15,  7, 13,  5]
+  ];
+
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
       const ci = (y * width + x) * 4;
-      const ri = (y * width + (x + 1)) * 4;
-      const li = (y * width + (x - 1)) * 4;
-      const bi = ((y + 1) * width + x) * 4;
-      const ti = ((y - 1) * width + x) * 4;
+      const brightness = 0.299 * pixels[ci] + 0.587 * pixels[ci + 1] + 0.114 * pixels[ci + 2];
 
-      const brightness = pixels[ci] + pixels[ci + 1] + pixels[ci + 2];
+      const threshold = (bayer[floor(y / step) % 4][floor(x / step) % 4] / 15.0) * 255;
+      const c = brightness > threshold ? light : dark;
 
-      const gx = (pixels[ri] + pixels[ri + 1] + pixels[ri + 2])
-               - (pixels[li] + pixels[li + 1] + pixels[li + 2]);
-      const gy = (pixels[bi] + pixels[bi + 1] + pixels[bi + 2])
-               - (pixels[ti] + pixels[ti + 1] + pixels[ti + 2]);
-      const g = abs(gx) + abs(gy);
-
-      const isEdge = g > edgeThreshold;
-      const isDarkArea = brightness < darkThreshold;
-
-      if (isEdge || isDarkArea) {
-        const no = x * 0.09 + y * 0.06;
-        const nx = (noise(no,       t) - 0.5) * 5;
-        const ny = (noise(no + 400, t) - 0.5) * 5;
-
-        const isDark = noise(x * 0.025, y * 0.025) > 0.48;
-        const sz     = noise(x * 0.035, y * 0.035) * 5 + 5;
-
-        // 어두운 영역은 더 투명하게 (밝기에 따라 alpha 조절)
-        const darkAlpha = isEdge ? 1.0 : map(brightness, 0, darkThreshold, 1.0, 0.35);
-
-        const ch = '|';
-
-        if (isDark) {
-          fill(48, 44, 175, 200 * darkAlpha);
-        } else {
-          fill(130, 185, 245, 175 * darkAlpha);
+      for (let dy = 0; dy < step && y + dy < height; dy++) {
+        for (let dx = 0; dx < step && x + dx < width; dx++) {
+          const i = ((y + dy) * width + (x + dx)) * 4;
+          pixels[i]     = c[0];
+          pixels[i + 1] = c[1];
+          pixels[i + 2] = c[2];
+          pixels[i + 3] = 255;
         }
-
-        textSize(sz);
-        text(ch, x + nx, y + ny);
       }
     }
   }
+
+  updatePixels();
 }
 
 // =========================
