@@ -118,13 +118,13 @@ body {
 
 /* 🗺️ 버튼 */
 #mapToggle {
-  width: 50px;
+  width: auto;
   height: 50px;
   border-radius: 25px;
   border: 2px solid rgba(255, 255, 255, 0);
   background: rgba(255, 255, 255, 0);
   cursor: pointer;
-  font-size: 30px;
+  font-size: 20px;
 }
 
 /* 버튼 컨테이너 */
@@ -189,7 +189,7 @@ body {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 30px;
+  font-size: 20px;
 }
 
 /* 필터 버튼 컨테이너 */
