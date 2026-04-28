@@ -9,7 +9,7 @@ const cityCoordinates = {
   "Seoul":    { lat: 37.5665, lon: 126.9780, label: "Seoul" },
   "Okinawa":  { lat: 26.2124, lon: 127.6809, label: "Okinawa" },
   "London":   { lat: 51.5072, lon: -0.1276,  label: "London" },
-  "Sydney":   { lat: -33.8688, lon: 151.2093, label: "Australia" },
+  "Sydney":   { lat: -33.8688, lon: 151.2093, label: "Sydney" },
   // 추가 도시
   "Paris":    { lat: 48.8566, lon: 2.3522,   label: "Paris" },
   "Berlin":   { lat: 52.5200, lon: 13.4050,  label: "Berlin" },
