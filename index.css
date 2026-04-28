@@ -245,7 +245,6 @@ body {
     height: 100dvh;
     min-height: 100dvh;
     overflow: hidden;
-    color: black;
   }
 
   * {
@@ -327,6 +326,7 @@ body {
     align-items: flex-end;
     flex-direction: column-reverse;
     z-index: 5;
+    color: black;
   }
 
   .filter-wrapper {
@@ -336,6 +336,7 @@ body {
     align-items: flex-start;
     flex-direction: column-reverse;
     z-index: 5;
+    color: black;
   }
 
   .city-buttons,
