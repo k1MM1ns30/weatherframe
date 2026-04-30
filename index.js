@@ -724,8 +724,8 @@ function drawRainSlitScan() {
 // pixel block snow
 // =========================
 function initPxSnow() {
-  const cols = Math.floor(width  / PX_BLOCK);
-  const rows = Math.ceil(height  / PX_BLOCK);
+  const cols = Math.ceil(width  / PX_BLOCK);
+  const rows = Math.ceil(height / PX_BLOCK);
   pxSnow = {
     cols, rows,
     stacks: new Array(cols).fill(0),
