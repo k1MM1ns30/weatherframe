@@ -65,21 +65,23 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 110px;
-  height: 110px;
+  width: 140px;
+  height: 140px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   z-index: -1;
   pointer-events: none;
-  filter: blur(5px);
 
   background: radial-gradient(
     circle,
-    rgba(255,255,255,0.75) 0%,
-    rgba(255,255,255,0.35) 35%,
-    rgba(255, 255, 255, 0.289) 45%,
-    rgba(255, 255, 255, 0.185) 60%,
-    rgba(255, 255, 255, 0.078) 70%
+    rgba(255,255,255,0.65) 0%,
+    rgba(255,255,255,0.50) 10%,
+    rgba(255,255,255,0.35) 22%,
+    rgba(255,255,255,0.22) 35%,
+    rgba(255,255,255,0.13) 50%,
+    rgba(255,255,255,0.06) 65%,
+    rgba(255,255,255,0.02) 78%,
+    rgba(255,255,255,0.00) 100%
   );
 }
 
@@ -353,8 +355,8 @@ body {
   }
 
   .weather-emoji::before {
-    width: 50px;
-    height: 50px;
+    width: 70px;
+    height: 70px;
   }
 
   .camera-frame {
@@ -501,8 +503,8 @@ body {
   }
 
   .weather-emoji::before {
-    width: 50px;
-    height: 50px;
+    width: 70px;
+    height: 70px;
   }
 
   .camera-frame {
