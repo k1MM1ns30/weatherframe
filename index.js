@@ -389,7 +389,7 @@ function draw() {
       }
 
       updatePixels();
-      drawCloudyWhiteOverlay();
+      if (window.innerWidth > MOBILE_BREAKPOINT) drawCloudyWhiteOverlay();
     } else if (rainEffectOn) {
       drawRainSlitScan();
     }
