@@ -9,7 +9,7 @@ const cityCoordinates = {
   "Seoul":    { lat: 37.5665, lon: 126.9780, label: "Seoul" },
   "Okinawa":  { lat: 26.2124, lon: 127.6809, label: "Okinawa" },
   "London":   { lat: 51.5072, lon: -0.1276,  label: "London" },
-  "Sydney":   { lat: -33.8688, lon: 151.2093, label: "Sydney" },
+  "Sydney":   { lat: -33.8688, lon: 151.2093, label: "Australia" },
   // 추가 도시
   "Paris":    { lat: 48.8566, lon: 2.3522,   label: "Paris" },
   "Berlin":   { lat: 52.5200, lon: 13.4050,  label: "Berlin" },
@@ -84,19 +84,17 @@ let windOffscreen = null;
 const RAIN_BUFFER_MAX = 30;
 let rainFrameBuffer = [];
 
-let glitterParticles = [];
+let pxSnow = null;
+const PX_BLOCK = 8;
+
+let cloudyCodeBuf = null;
+let cloudyCodeFrame = 0;
+const CLOUDY_CODE = [1,0,1,1,0,1,1,1,0,1,0,0,1,0,1,1,0,0,0,1,1,0,1,0,0,1,1,1,1,0,1,0];
 
 let sunnyEffectOn = false;
-let sunnyStars = null;
-let sunnyGraphics = null;
-
-const snowPalette = [
-  "#ffffff",
-  "#f9fdff",
-  "#e6f7ff",
-  "#dff4ff",
-  "#f0fbff"
-];
+let bloomOffscreen = null;
+let bloomBright    = null;
+let bloomBlur      = null;
 
 // 현재 날씨 데이터를 저장해두고
 // 수동 필터 선택 시 다시 렌더링할 때 사용
@@ -175,7 +173,8 @@ function setup() {
 function windowResized() {
   const { frameWidth, frameHeight } = getFrameSize();
   resizeCanvas(frameWidth, frameHeight);
-  sunnyStars = null;
+  bloomOffscreen = bloomBright = bloomBlur = null;
+  pxSnow = null;
 }
 
 function drawCameraCover(videoSource) {
@@ -316,7 +315,7 @@ function draw() {
     drawWindEffect();
 
   } else if (sunnyEffectOn) {
-    drawSunnyEffect();
+    drawBloomEffect();
 
   } else {
     drawCameraCover(cam);
@@ -362,33 +361,31 @@ function draw() {
       updatePixels();
 
     } else if (cloudyEffectOn) {
+      drawCameraCover(cam);
       loadPixels();
-      const sourcePixels = pixels.slice();
 
-      for (let y = 1; y < height - 1; y++) {
-        for (let x = 1; x < width - 1; x++) {
-          const index = (x + y * width) * 4;
+      const pxLen = pixels.length;
+      if (!cloudyCodeBuf || cloudyCodeBuf.length !== pxLen) {
+        cloudyCodeBuf = new Float32Array(pxLen);
+        for (let i = 0; i < pxLen; i++) cloudyCodeBuf[i] = pixels[i];
+        cloudyCodeFrame = 0;
+      }
 
-          let totalR = -2;
-          let totalG = -2;
-          let totalB = -2;
-          let count = 0.5;
+      const bit = CLOUDY_CODE[cloudyCodeFrame % 32];
+      cloudyCodeFrame++;
+      const alpha = bit === 1 ? 0.18 : 0.02;
 
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              const i = ((x + dx) + (y + dy) * width) * 4;
-              totalR += sourcePixels[i];
-              totalG += sourcePixels[i + 1];
-              totalB += sourcePixels[i + 2];
-              count++;
-            }
-          }
+      for (let i = 0; i < pxLen; i += 4) {
+        cloudyCodeBuf[i]   = cloudyCodeBuf[i]   * (1 - alpha) + pixels[i]   * alpha;
+        cloudyCodeBuf[i+1] = cloudyCodeBuf[i+1] * (1 - alpha) + pixels[i+1] * alpha;
+        cloudyCodeBuf[i+2] = cloudyCodeBuf[i+2] * (1 - alpha) + pixels[i+2] * alpha;
+      }
 
-          pixels[index] = min((totalR / count) * 1.3, 255);
-          pixels[index + 1] = min((totalG / count) * 1.33, 255);
-          pixels[index + 2] = min((totalB / count) * 1.45, 255);
-          pixels[index + 3] = 255;
-        }
+      for (let i = 0; i < pxLen; i += 4) {
+        pixels[i]   = cloudyCodeBuf[i];
+        pixels[i+1] = cloudyCodeBuf[i+1];
+        pixels[i+2] = cloudyCodeBuf[i+2];
+        pixels[i+3] = 255;
       }
 
       updatePixels();
@@ -420,24 +417,11 @@ function draw() {
     rect(0, 0, width, height);
     pop();
 
-    if (frameCount % 4 === 0) {
-      glitterParticles.push(new FallingGlitter());
-    }
+    if (!pxSnow) initPxSnow();
+    stepPxSnow();
 
-    if (glitterParticles.length > 24) {
-      glitterParticles.splice(0, glitterParticles.length - 24);
-    }
-
-    for (let i = glitterParticles.length - 1; i >= 0; i--) {
-      glitterParticles[i].update();
-      glitterParticles[i].display();
-
-      if (glitterParticles[i].isOut()) {
-        glitterParticles.splice(i, 1);
-      }
-    }
   } else {
-    glitterParticles = [];
+    pxSnow = null;
   }
 
   if (!rainEffectOn) {
@@ -502,132 +486,77 @@ function shuffleWindOrder() {
 }
 
 // =========================
-// sunny: 2분할 별 마스크 효과
+// sunny: bloom (빛번짐) 효과
 // =========================
-function initSunny() {
-  randomSeed(42);
-  sunnyStars = [];
-  const halfH = height / 2;
-  const cols = 5;
-  const rows = 5;
-  const cellW = width / cols;
-  const cellHBot = (halfH - 16) / rows;
+function drawBloomEffect() {
+  drawCameraCover(cam);
 
-  // random 시퀀스 소비 (상단용 - 버림)
-  for (let i = 0; i < rows * cols; i++) {
-    random(); random(); random();
-  }
-
-  // 하단: 5x5 그리드에 랜덤 오프셋 (위치 고정)
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      sunnyStars.push({
-        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
-        y: halfH + 8 + row * cellHBot + random(cellHBot * 0.1, cellHBot * 0.9),
-        r: random(7, 18)
-      });
-    }
-  }
-
-  // 상단: 하단 별을 먼저 복사한 뒤 y를 위쪽으로 이동
-  const bottomCopy = sunnyStars.slice();
-  const topStars = bottomCopy.map(s => ({ x: s.x, y: s.y - halfH, r: s.r }));
-  sunnyStars = [...topStars, ...bottomCopy];
-
-  // 민트 3개 (하단 인덱스: 26, 37, 43)
-  sunnyStars[26].col = 'mint';
-  sunnyStars[37].col = 'mint';
-  sunnyStars[43].col = 'mint';
-  // 고동색 2개 (하단 인덱스: 31, 47)
-  sunnyStars[31].col = 'brown';
-  sunnyStars[47].col = 'brown';
-}
-
-function drawSunnyEffect() {
-  if (!sunnyStars) initSunny();
-
-  const halfH = height / 2;
   const ctx = drawingContext;
-  const video = cam.elt;
+  const cvs = ctx.canvas;
 
-  if (!video || !video.videoWidth) {
-    drawCameraCover(cam);
-    return;
+  // 크기가 바뀌었거나 아직 없으면 재생성
+  if (!bloomOffscreen || bloomOffscreen.width !== width || bloomOffscreen.height !== height) {
+    bloomOffscreen = document.createElement('canvas');
+    bloomBright    = document.createElement('canvas');
+    bloomBlur      = document.createElement('canvas');
+    bloomOffscreen.width  = bloomBright.width  = bloomBlur.width  = width;
+    bloomOffscreen.height = bloomBright.height = bloomBlur.height = height;
   }
 
-  // 각 절반(width × halfH) 기준으로 crop 계산
-  const srcW = video.videoWidth;
-  const srcH = video.videoHeight;
-  const destRatio = width / halfH;
-  const srcRatio = srcW / srcH;
-  let sx, sy, sw, sh;
-  if (srcRatio > destRatio) {
-    sh = srcH; sw = srcH * destRatio;
-    sx = (srcW - sw) / 2; sy = 0;
-  } else {
-    sw = srcW; sh = srcW / destRatio;
-    sx = 0; sy = (srcH - sh) / 2;
-  }
-  if (FORCE_MOBILE_CAMERA) {
-    const zSw = sw / MOBILE_CAMERA_ZOOM;
-    const zSh = sh / MOBILE_CAMERA_ZOOM;
-    sx += (sw - zSw) / 2; sy += (sh - zSh) / 2;
-    sw = zSw; sh = zSh;
-  }
+  const offCtx    = bloomOffscreen.getContext('2d');
+  const brightCtx = bloomBright.getContext('2d');
+  const blurCtx   = bloomBlur.getContext('2d');
 
-  function makeStarPath(cx, cy, r) {
-    ctx.beginPath();
-    const inner = r * 0.42;
-    for (let i = 0; i < 10; i++) {
-      const angle = (i * Math.PI / 5) - Math.PI / 2;
-      const rad = i % 2 === 0 ? r : inner;
-      const px = cx + Math.cos(angle) * rad;
-      const py = cy + Math.sin(angle) * rad;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+  // 1. 현재 캔버스(카메라) → bloomOffscreen 복사
+  offCtx.drawImage(cvs, 0, 0);
+
+  // 2. 픽셀 처리: 밝은 레이어 추출 + 어두운 영역 심화
+  const imgData   = offCtx.getImageData(0, 0, width, height);
+  const px        = imgData.data;
+  const brightImg = new ImageData(width, height);
+  const bp        = brightImg.data;
+
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    // 밝은 픽셀(luma > 155)만 bloom 레이어에 추출
+    if (luma > 155) {
+      bp[i]   = r;
+      bp[i+1] = g;
+      bp[i+2] = b;
+      bp[i+3] = 255;
     }
-    ctx.closePath();
-  }
 
-  // 상단: 흰 배경 + 별 clip 안에 카메라(상단 절반에 꽉 차게)
-  ctx.fillStyle = 'white';
-  ctx.fillRect(0, 0, width, halfH);
-
-  for (const s of sunnyStars) {
-    if (s.y < halfH) {
-      ctx.save();
-      makeStarPath(s.x, s.y, s.r);
-      ctx.clip();
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, halfH);
-      ctx.restore();
+    // 어두운 영역(luma < 90) 더 어둡게: f = 0.5(luma=0) ~ 0.85(luma=90)
+    if (luma < 90) {
+      const f = 0.5 + (luma / 90) * 0.35;
+      px[i]   = r * f;
+      px[i+1] = g * f;
+      px[i+2] = b * f;
     }
   }
 
-  // 하단: 카메라(하단 절반에 꽉 차게) + 별 도형
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, halfH, width, halfH);
-  ctx.clip();
-  ctx.drawImage(video, sx, sy, sw, sh, 0, halfH, width, halfH);
-  ctx.restore();
+  offCtx.putImageData(imgData, 0, 0);
+  brightCtx.putImageData(brightImg, 0, 0);
 
-  for (const s of sunnyStars) {
-    if (s.y >= halfH) {
-      if (s.col === 'mint')       ctx.fillStyle = 'rgb(152, 224, 210)';
-      else if (s.col === 'brown') ctx.fillStyle = 'rgb(90, 42, 18)';
-      else                        ctx.fillStyle = 'white';
-      makeStarPath(s.x, s.y, s.r);
-      ctx.fill();
-    }
-  }
+  // 3. 밝은 레이어에 blur 적용 → bloomBlur
+  blurCtx.clearRect(0, 0, width, height);
+  blurCtx.filter = 'blur(28px)';
+  blurCtx.drawImage(bloomBright, 0, 0);
+  blurCtx.filter = 'none';
 
-  // 분할선
-  ctx.strokeStyle = 'rgba(180,180,180,0.8)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, halfH);
-  ctx.lineTo(width, halfH);
-  ctx.stroke();
+  // 4. 어두워진 베이스 덮어쓰기 + screen 블렌드 3회 합성
+  ctx.drawImage(bloomOffscreen, 0, 0);
+  ctx.globalCompositeOperation = 'screen';
+  ctx.drawImage(bloomBlur, 0, 0);
+  ctx.drawImage(bloomBlur, 0, 0);
+  ctx.drawImage(bloomBlur, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 5. 전체 핑크 분위기 오버레이
+  ctx.fillStyle = 'rgba(255, 188, 53, 0.32))';
+  ctx.fillRect(0, 0, width, height);
 }
 
 // =========================
@@ -714,127 +643,83 @@ function drawRainSlitScan() {
   updatePixels();
 }
 
-class FallingGlitter {
-  constructor() {
-    this.x = random(width);
-    this.y = random(-100, height * 0.3);
+// =========================
+// pixel block snow
+// =========================
+function initPxSnow() {
+  const cols = Math.floor(width  / PX_BLOCK);
+  const rows = Math.floor(height / PX_BLOCK);
+  pxSnow = {
+    cols, rows,
+    stacks: new Array(cols).fill(0),
+    blocks: [],
+    timers: Array.from({ length: cols }, () => Math.floor(random(1, 28))),
+    phase: 'falling',
+    pauseTimer: 0,
+    tick: 0
+  };
+}
 
-    this.vx = random(-0.15, 0.15);
-    this.vy = random(1.2, 2.8);
+function stepPxSnow() {
+  const { cols, rows, stacks, blocks, timers } = pxSnow;
+  const bs = PX_BLOCK;
 
-    this.size = random(5, 10);
+  // 4프레임 중 3번 업데이트 → 기존 대비 1.5배 속도
+  pxSnow.tick = (pxSnow.tick + 1) % 2.5;
+  const doUpdate = pxSnow.tick !== 0;
 
-    this.color = color(random(snowPalette));
-
-    this.alphaBase = random(200, 255);
-    this.alpha = this.alphaBase;
-
-    this.twinkleSpeed = random(0.02, 0.06);
-    this.twinkleOffset = random(TWO_PI);
-
-    this.shapeType = floor(random(3));
-
-    this.seed = random(1000);
-    this.tailLength = random(20, 46);
-
-    this.clusterPoints = [];
-    if (this.shapeType === 2) {
-      let pointCount = floor(random(10, 15));
-      for (let i = 0; i < pointCount; i++) {
-        this.clusterPoints.push({
-          ox: randomGaussian(0, this.size * 0.55),
-          oy: randomGaussian(0, this.size * 0.55),
-          r: random(0.8, 1.5)
-        });
-      }
-    }
-  }
-
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.x += sin(frameCount * 0.025 + this.seed) * 0.06;
-
-    this.alpha =
-      this.alphaBase +
-      sin(frameCount * this.twinkleSpeed + this.twinkleOffset) * 35;
-  }
-
-  display() {
-    push();
-    translate(this.x, this.y);
-
-    const c = color(this.color);
-
-    if (this.shapeType === 0) {
-      drawingContext.shadowBlur = this.size * 1.2;
-      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
-
-      stroke(red(c), green(c), blue(c), this.alpha);
-      strokeWeight(1.1);
-
-      line(-this.size * 0.9, 0, this.size * 0.9, 0);
-      line(0, -this.size * 0.9, 0, this.size * 0.9);
-
-      line(-this.size * 0.42, -this.size * 0.42, this.size * 0.42, this.size * 0.42);
-      line(-this.size * 0.42, this.size * 0.42, this.size * 0.42, -this.size * 0.42);
-
-      noStroke();
-      fill(red(c), green(c), blue(c), this.alpha);
-      circle(0, 0, this.size * 0.22);
-
-    } else if (this.shapeType === 1) {
-      drawingContext.shadowBlur = this.tailLength * 0.1;
-      drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${this.alpha / 255})`;
-
-      let segments = 4;
-      for (let i = 0; i < segments; i++) {
-        let t1 = i / segments;
-        let t2 = (i + 1) / segments;
-
-        let y1 = lerp(-this.tailLength, 0, t1);
-        let y2 = lerp(-this.tailLength, 0, t2);
-
-        let segAlpha = lerp(this.alpha * 0.12, this.alpha * 0.55, t2);
-        let segWeight = lerp(0.25, 1.35, t2);
-
-        stroke(red(c), green(c), blue(c), segAlpha);
-        strokeWeight(segWeight);
-        line(0, y1, 0, y2);
+  if (pxSnow.phase === 'falling') {
+    if (doUpdate) {
+      // spawn: 컬럼별 독립 타이머
+      for (let c = 0; c < cols; c++) {
+        if (--timers[c] <= 0) {
+          if (stacks[c] < rows) blocks.push({ col: c, y: 0 });
+          timers[c] = Math.floor(random(6, 18));
+        }
       }
 
-      drawingContext.shadowBlur = this.size * 0.9;
-      stroke(red(c), green(c), blue(c), this.alpha);
-      strokeWeight(1);
-
-      line(-this.size * 0.55, 0, this.size * 0.55, 0);
-      line(0, -this.size * 0.55, 0, this.size * 0.55);
-
-      noStroke();
-      fill(red(c), green(c), blue(c), this.alpha);
-      circle(0, 0, this.size * 0.16);
-
-    } else if (this.shapeType === 2) {
-      noStroke();
-
-      for (let p of this.clusterPoints) {
-        let localAlpha = this.alpha * 0.85;
-
-        drawingContext.shadowBlur = p.r * 1.8;
-        drawingContext.shadowColor = `rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${localAlpha / 255})`;
-
-        fill(red(c), green(c), blue(c), localAlpha);
-        circle(p.ox, p.oy, p.r);
+      // 이동: 바닥 쪽 블록 먼저 처리해야 stacks 정합성 유지
+      blocks.sort((a, b) => b.y - a.y);
+      for (let i = 0; i < blocks.length; i++) {
+        blocks[i].y += bs;
+        const landY = height - (stacks[blocks[i].col] + 1) * bs;
+        if (blocks[i].y >= landY) {
+          stacks[blocks[i].col]++;
+          blocks.splice(i, 1);
+          i--;
+        }
       }
     }
 
-    pop();
-    drawingContext.shadowBlur = 0;
+    // 모든 컬럼이 꽉 차면 pause 후 재시작
+    if (stacks.every(s => s >= rows)) {
+      pxSnow.phase = 'pause';
+      pxSnow.pauseTimer = 30;
+    }
+
+  } else {
+    // 짧은 pause 후 초기화
+    if (--pxSnow.pauseTimer <= 0) {
+      stacks.fill(0);
+      blocks.length = 0;
+      for (let c = 0; c < cols; c++) timers[c] = Math.floor(random(1, 28));
+      pxSnow.phase = 'falling';
+    }
   }
 
-  isOut() {
-    return this.y > height + this.tailLength + 20;
+  // 렌더링
+  push();
+  noStroke();
+  fill(235, 245, 255, 215);
+  for (let c = 0; c < cols; c++) {
+    for (let row = 0; row < stacks[c]; row++) {
+      rect(c * bs, height - (row + 1) * bs, bs, bs);
+    }
   }
+  for (const b of blocks) {
+    rect(b.col * bs, b.y, bs, bs);
+  }
+  pop();
 }
 
 // =========================
@@ -1047,11 +932,13 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   document.getElementById("weatherEmoji").textContent = style.emoji;
   hotEffectOn = style.hotEffectOn;
   cloudyEffectOn = style.cloudyEffectOn;
+  if (!cloudyEffectOn) { cloudyCodeBuf = null; cloudyCodeFrame = 0; }
   snowEffectOn = style.snowEffectOn;
   fogEffectOn = style.fogEffectOn;
   rainEffectOn = style.rainEffectOn ?? false;
   coldEffectOn = style.coldEffectOn ?? false;
   sunnyEffectOn = style.sunnyEffectOn ?? false;
+  if (!sunnyEffectOn) { bloomOffscreen = bloomBright = bloomBlur = null; }
   windEffectOn = style.windEffectOn ?? false;
 
   console.log("weatherType:", weatherType, "| manualFilterType:", manualFilterType);

@@ -385,10 +385,10 @@ body {
   }
 
   #captureBtn {
-    width: 64px;
-    height: 64px;
+    width: 68px;
+    height: 68px;
     margin-top: 4px;
-    font-size: 11px;
+    font-size: 15px;
     border-radius: 50%;
     flex: 0 0 auto;
   }
@@ -448,6 +448,16 @@ body {
     pointer-events: auto;
   }
 
+  .city-btn,
+  .filter-btn {
+    font-size: 15px;
+  }
+
+  #mapToggle,
+  #filterToggle {
+    font-size: 15px;
+  }
+
     /* #cameraToggleBtn {
     position: fixed;
     top: calc(12px + env(safe-area-inset-top));
@@ -501,9 +511,9 @@ body {
   }
 
   #captureBtn {
-    width: 58px;
-    height: 58px;
-    font-size: 10px;
+    width: 68px;
+    height: 68px;
+    font-size: 15px;
     margin-top: 2px;
   }
 
