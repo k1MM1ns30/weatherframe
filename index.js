@@ -1261,12 +1261,9 @@ if (captureBtn) {
   captureBtn.addEventListener("click", async () => {
     const cityWrapper = document.querySelector(".city-wrapper");
     const filterWrapper = document.querySelector(".filter-wrapper");
-    const captureButton = document.getElementById("captureBtn");
 
-    // 저장할 때 제외
     cityWrapper.style.visibility = "hidden";
     filterWrapper.style.visibility = "hidden";
-    captureButton.style.visibility = "hidden";
 
     const target = document.getElementById("captureArea");
     const bg = getComputedStyle(document.body).backgroundColor;
@@ -1281,9 +1278,7 @@ if (captureBtn) {
     link.href = canvas.toDataURL("image/png");
     link.click();
 
-    // 다시 보이게
     cityWrapper.style.visibility = "visible";
     filterWrapper.style.visibility = "visible";
-    captureButton.style.visibility = "visible";
   });
 }
