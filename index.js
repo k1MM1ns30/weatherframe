@@ -86,15 +86,15 @@ let rainFrameBuffer = [];
 
 let pxSnow = null;
 const PX_BLOCK = 8;
+let snowSoftOffscreen = null;
 
 let cloudyCodeBuf = null;
 let cloudyCodeFrame = 0;
 const CLOUDY_CODE = [1,0,1,1,0,1,1,1,0,1,0,0,1,0,1,1,0,0,0,1,1,0,1,0,0,1,1,1,1,0,1,0];
 
 let sunnyEffectOn = false;
-let bloomOffscreen = null;
-let bloomBright    = null;
-let bloomBlur      = null;
+let sunnyStars = null;
+let sunnyGraphics = null;
 
 // 현재 날씨 데이터를 저장해두고
 // 수동 필터 선택 시 다시 렌더링할 때 사용
@@ -173,7 +173,7 @@ function setup() {
 function windowResized() {
   const { frameWidth, frameHeight } = getFrameSize();
   resizeCanvas(frameWidth, frameHeight);
-  bloomOffscreen = bloomBright = bloomBlur = null;
+  sunnyStars = null;
   pxSnow = null;
 }
 
@@ -315,7 +315,7 @@ function draw() {
     drawWindEffect();
 
   } else if (sunnyEffectOn) {
-    drawBloomEffect();
+    drawSunnyEffect();
 
   } else {
     drawCameraCover(cam);
@@ -411,6 +411,28 @@ function draw() {
     }
     updatePixels();
 
+    // 피부 보정: 밝은 영역에 소프트 블러 글로우 (screen 블렌드)
+    const ctx = drawingContext;
+    const cvs = ctx.canvas;
+    if (!snowSoftOffscreen || snowSoftOffscreen.width !== width || snowSoftOffscreen.height !== height) {
+      snowSoftOffscreen = document.createElement('canvas');
+      snowSoftOffscreen.width  = width;
+      snowSoftOffscreen.height = height;
+    }
+    snowSoftOffscreen.getContext('2d').drawImage(cvs, 0, 0);
+    // 1차: 넓은 블러로 전체 소프트닝
+    ctx.filter = 'blur(14px)';
+    ctx.globalAlpha = 0.42;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(snowSoftOffscreen, 0, 0);
+    // 2차: 좁은 블러로 하이라이트 강화
+    ctx.filter = 'blur(6px)';
+    ctx.globalAlpha = 0.22;
+    ctx.drawImage(snowSoftOffscreen, 0, 0);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
+
     push();
     noStroke();
     fill(220, 235, 255, 38);
@@ -422,6 +444,7 @@ function draw() {
 
   } else {
     pxSnow = null;
+    snowSoftOffscreen = null;
   }
 
   if (!rainEffectOn) {
@@ -486,77 +509,131 @@ function shuffleWindOrder() {
 }
 
 // =========================
-// sunny: bloom (빛번짐) 효과
+// sunny: spin blur (회전 줄기) 효과
 // =========================
-function drawBloomEffect() {
-  drawCameraCover(cam);
+// sunny: 2분할 별 마스크 효과
+// =========================
+function initSunny() {
+  randomSeed(42);
+  sunnyStars = [];
+  const halfH = height / 2;
+  const cols = 5;
+  const rows = 5;
+  const cellW = width / cols;
+  const cellHBot = (halfH - 16) / rows;
 
+  for (let i = 0; i < rows * cols; i++) {
+    random(); random(); random();
+  }
+
+  const allBottom = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      allBottom.push({
+        x: col * cellW + random(cellW * 0.12, cellW * 0.88),
+        y: halfH + 8 + row * cellHBot + random(cellHBot * 0.1, cellHBot * 0.9),
+        r: random(7, 18)
+      });
+    }
+  }
+
+  allBottom[1].col  = 'mint';
+  allBottom[6].col  = 'brown';
+  allBottom[12].col = 'mint';
+  allBottom[18].col = 'mint';
+  allBottom[22].col = 'brown';
+
+  const removeSet = new Set([3, 4, 7, 9, 10, 20]);
+  const bottomStars = allBottom.filter((_, i) => !removeSet.has(i));
+
+  const topStars = bottomStars.map(s => ({ x: s.x, y: s.y - halfH, r: s.r }));
+  sunnyStars = [...topStars, ...bottomStars];
+}
+
+function drawSunnyEffect() {
+  if (!sunnyStars) initSunny();
+
+  const halfH = height / 2;
   const ctx = drawingContext;
-  const cvs = ctx.canvas;
+  const video = cam.elt;
 
-  // 크기가 바뀌었거나 아직 없으면 재생성
-  if (!bloomOffscreen || bloomOffscreen.width !== width || bloomOffscreen.height !== height) {
-    bloomOffscreen = document.createElement('canvas');
-    bloomBright    = document.createElement('canvas');
-    bloomBlur      = document.createElement('canvas');
-    bloomOffscreen.width  = bloomBright.width  = bloomBlur.width  = width;
-    bloomOffscreen.height = bloomBright.height = bloomBlur.height = height;
+  if (!video || !video.videoWidth) {
+    drawCameraCover(cam);
+    return;
   }
 
-  const offCtx    = bloomOffscreen.getContext('2d');
-  const brightCtx = bloomBright.getContext('2d');
-  const blurCtx   = bloomBlur.getContext('2d');
+  const srcW = video.videoWidth;
+  const srcH = video.videoHeight;
+  const destRatio = width / halfH;
+  const srcRatio = srcW / srcH;
+  let sx, sy, sw, sh;
+  if (srcRatio > destRatio) {
+    sh = srcH; sw = srcH * destRatio;
+    sx = (srcW - sw) / 2; sy = 0;
+  } else {
+    sw = srcW; sh = srcW / destRatio;
+    sx = 0; sy = (srcH - sh) / 2;
+  }
+  if (FORCE_MOBILE_CAMERA) {
+    const zSw = sw / MOBILE_CAMERA_ZOOM;
+    const zSh = sh / MOBILE_CAMERA_ZOOM;
+    sx += (sw - zSw) / 2; sy += (sh - zSh) / 2;
+    sw = zSw; sh = zSh;
+  }
 
-  // 1. 현재 캔버스(카메라) → bloomOffscreen 복사
-  offCtx.drawImage(cvs, 0, 0);
-
-  // 2. 픽셀 처리: 밝은 레이어 추출 + 어두운 영역 심화
-  const imgData   = offCtx.getImageData(0, 0, width, height);
-  const px        = imgData.data;
-  const brightImg = new ImageData(width, height);
-  const bp        = brightImg.data;
-
-  for (let i = 0; i < px.length; i += 4) {
-    const r = px[i], g = px[i + 1], b = px[i + 2];
-    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // 밝은 픽셀(luma > 155)만 bloom 레이어에 추출
-    if (luma > 155) {
-      bp[i]   = r;
-      bp[i+1] = g;
-      bp[i+2] = b;
-      bp[i+3] = 255;
+  function makeStarPath(cx, cy, r) {
+    ctx.beginPath();
+    const inner = r * 0.42;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * Math.PI / 5) - Math.PI / 2;
+      const rad = i % 2 === 0 ? r : inner;
+      const px = cx + Math.cos(angle) * rad;
+      const py = cy + Math.sin(angle) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     }
+    ctx.closePath();
+  }
 
-    // 어두운 영역(luma < 90) 더 어둡게: f = 0.5(luma=0) ~ 0.85(luma=90)
-    if (luma < 90) {
-      const f = 0.5 + (luma / 90) * 0.35;
-      px[i]   = r * f;
-      px[i+1] = g * f;
-      px[i+2] = b * f;
+  // 상단: 흰 배경 + 별 clip 안에 카메라
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, width, halfH);
+
+  for (const s of sunnyStars) {
+    if (s.y < halfH) {
+      ctx.save();
+      makeStarPath(s.x, s.y, s.r);
+      ctx.clip();
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, halfH);
+      ctx.restore();
     }
   }
 
-  offCtx.putImageData(imgData, 0, 0);
-  brightCtx.putImageData(brightImg, 0, 0);
+  // 하단: 카메라 + 별 도형
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, halfH, width, halfH);
+  ctx.clip();
+  ctx.drawImage(video, sx, sy, sw, sh, 0, halfH, width, halfH);
+  ctx.restore();
 
-  // 3. 밝은 레이어에 blur 적용 → bloomBlur
-  blurCtx.clearRect(0, 0, width, height);
-  blurCtx.filter = 'blur(28px)';
-  blurCtx.drawImage(bloomBright, 0, 0);
-  blurCtx.filter = 'none';
+  for (const s of sunnyStars) {
+    if (s.y >= halfH) {
+      if (s.col === 'mint')       ctx.fillStyle = 'rgb(152, 224, 210)';
+      else if (s.col === 'brown') ctx.fillStyle = 'rgb(90, 42, 18)';
+      else                        ctx.fillStyle = 'white';
+      makeStarPath(s.x, s.y, s.r);
+      ctx.fill();
+    }
+  }
 
-  // 4. 어두워진 베이스 덮어쓰기 + screen 블렌드 3회 합성
-  ctx.drawImage(bloomOffscreen, 0, 0);
-  ctx.globalCompositeOperation = 'screen';
-  ctx.drawImage(bloomBlur, 0, 0);
-  ctx.drawImage(bloomBlur, 0, 0);
-  ctx.drawImage(bloomBlur, 0, 0);
-  ctx.globalCompositeOperation = 'source-over';
-
-  // 5. 전체 핑크 분위기 오버레이
-  ctx.fillStyle = 'rgba(255, 188, 53, 0.32))';
-  ctx.fillRect(0, 0, width, height);
+  // 분할선
+  ctx.strokeStyle = 'rgba(180,180,180,0.8)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, halfH);
+  ctx.lineTo(width, halfH);
+  ctx.stroke();
 }
 
 // =========================
@@ -648,7 +725,7 @@ function drawRainSlitScan() {
 // =========================
 function initPxSnow() {
   const cols = Math.floor(width  / PX_BLOCK);
-  const rows = Math.floor(height / PX_BLOCK);
+  const rows = Math.ceil(height  / PX_BLOCK);
   pxSnow = {
     cols, rows,
     stacks: new Array(cols).fill(0),
@@ -938,7 +1015,7 @@ function applyWeatherStyle(weatherType, cityLabel, data) {
   rainEffectOn = style.rainEffectOn ?? false;
   coldEffectOn = style.coldEffectOn ?? false;
   sunnyEffectOn = style.sunnyEffectOn ?? false;
-  if (!sunnyEffectOn) { bloomOffscreen = bloomBright = bloomBlur = null; }
+  if (!sunnyEffectOn) { sunnyStars = null; }
   windEffectOn = style.windEffectOn ?? false;
 
   console.log("weatherType:", weatherType, "| manualFilterType:", manualFilterType);

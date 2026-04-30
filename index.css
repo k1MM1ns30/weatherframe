@@ -253,28 +253,28 @@ body {
 
 .location-modal-box {
   background: white;
-  padding: 24px 20px;
-  border-radius: 0;
+  padding: 40px 52px;
+  border-radius: 50%;
   border: 1px solid black;
-  width: min(80vw, 300px);
+  width: min(88vw, 360px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.18);
 }
 
 .location-modal-box p {
   margin: 0;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: normal;
   font-family: Arial, sans-serif;
   text-align: center;
 }
 
 #locationInput {
-  width: 100%;
+  margin: 0 36px;
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: 22px;
   font-family: Arial, sans-serif;
   border: 1px solid #ccc;
   border-radius: 0;
@@ -289,12 +289,13 @@ body {
 .location-modal-btns {
   display: flex;
   gap: 8px;
+  margin: 0 36px;
 }
 
 .location-modal-btns button {
   flex: 1;
   padding: 10px;
-  font-size: 13px;
+  font-size: 22px;
   font-family: Arial, sans-serif;
   border-radius: 0;
   cursor: pointer;
@@ -455,6 +456,12 @@ body {
 
   #mapToggle,
   #filterToggle {
+    font-size: 15px;
+  }
+
+  .location-modal-box p,
+  #locationInput,
+  .location-modal-btns button {
     font-size: 15px;
   }
 
