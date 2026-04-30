@@ -125,6 +125,7 @@ body {
   background: rgba(255, 255, 255, 0);
   cursor: pointer;
   font-size: 22px;
+  color: black;
 }
 
 /* 버튼 컨테이너 */
@@ -155,6 +156,7 @@ body {
   background: rgba(255,255,255,0.7);
   border: 1px solid black;
   cursor: pointer;
+  color: black;
 }
 
 .city-btn:hover {
@@ -190,6 +192,7 @@ body {
   background: transparent;
   cursor: pointer;
   font-size: 22px;
+  color: black;
 }
 
 /* 필터 버튼 컨테이너 */
@@ -220,6 +223,7 @@ body {
   background: rgba(255,255,255,0.7);
   border: 1px solid black;
   cursor: pointer;
+  color: black;
 }
 
 .filter-btn:hover {

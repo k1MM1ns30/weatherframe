@@ -282,16 +282,16 @@ function drawFogPixelated(videoSource) {
 
   updatePixels();
 
-  push();
-  noStroke();
-
-  for (let y = 0; y < height; y++) {
-    const alpha = map(y, 0, height, 70, 16);
-    fill(255, 255, 255, alpha);
-    rect(0, y, width, 1);
+  if (window.innerWidth > MOBILE_BREAKPOINT) {
+    push();
+    noStroke();
+    for (let y = 0; y < height; y++) {
+      const alpha = map(y, 0, height, 70, 16);
+      fill(255, 255, 255, alpha);
+      rect(0, y, width, 1);
+    }
+    pop();
   }
-
-  pop();
 }
 
 
