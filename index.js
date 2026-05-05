@@ -1274,3 +1274,4 @@ if (captureBtn) {
     filterWrapper.style.visibility = "visible";
   });
 }
+
