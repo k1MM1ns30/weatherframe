@@ -347,7 +347,7 @@ body {
     justify-content: flex-start;
     align-items: center;
     gap: 12px;
-    padding-top: 60px;
+    padding-top: 45px;
     padding-bottom: 30px;
     overflow: hidden;
   }
@@ -498,7 +498,7 @@ body {
 @media (max-width: 460px) and (max-height: 780px) {
   .canvas {
     gap: 8px;
-    padding-top: 35px;
+    padding-top: 40px;
     padding-bottom: 50px;
   }
 
