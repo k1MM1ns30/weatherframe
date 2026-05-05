@@ -520,7 +520,7 @@ body {
     width: min(82vw, 320px);
     font-size: 18px;
     line-height: 1.2;
-    margin-top: 15px;
+    margin-top: 10px;
   }
 
   .info p {
@@ -531,7 +531,7 @@ body {
     width: 70px;
     height: 70px;
     font-size: 16px;
-    margin-top: 10px;
+    margin-top: 15px;
   }
 
 }
