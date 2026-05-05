@@ -1,6 +1,4 @@
 const MOBILE_BREAKPOINT = 460;
-const FORCE_MOBILE_CAMERA = true;
-const MOBILE_CAMERA_ZOOM = 1;
 
 
 const cityCoordinates = {
@@ -94,7 +92,6 @@ const CLOUDY_CODE = [1,0,1,1,0,1,1,1,0,1,0,0,1,0,1,1,0,0,0,1,1,0,1,0,0,1,1,1,1,0
 
 let sunnyEffectOn = false;
 let sunnyStars = null;
-let sunnyGraphics = null;
 
 // 현재 날씨 데이터를 저장해두고
 // 수동 필터 선택 시 다시 렌더링할 때 사용
@@ -125,22 +122,17 @@ function setup() {
   const canvas = createCanvas(frameWidth, frameHeight);
   canvas.parent("p5-container");
 
-  const cameraConstraints = FORCE_MOBILE_CAMERA
-    ? {
-        video: {
-          facingMode: { ideal: "user" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          aspectRatio: { ideal: 16 / 9 },
-          frameRate: { ideal: 30, max: 30 },
-          resizeMode: "none"
-        },
-        audio: false
-      }
-    : {
-        video: true,
-        audio: false
-      };
+  const cameraConstraints = {
+    video: {
+      facingMode: { ideal: "user" },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      aspectRatio: { ideal: 16 / 9 },
+      frameRate: { ideal: 30, max: 30 },
+      resizeMode: "none"
+    },
+    audio: false
+  };
 
   cam = createCapture(cameraConstraints, () => {
     if (!cam || !cam.elt) return;
@@ -204,15 +196,6 @@ function drawCameraCover(videoSource) {
     sh = srcW / destRatio;
     sx = 0;
     sy = (srcH - sh) / 2;
-  }
-
-  if (FORCE_MOBILE_CAMERA) {
-    const zoomedSw = sw / MOBILE_CAMERA_ZOOM;
-    const zoomedSh = sh / MOBILE_CAMERA_ZOOM;
-    sx += (sw - zoomedSw) / 2;
-    sy += (sh - zoomedSh) / 2;
-    sw = zoomedSw;
-    sh = zoomedSh;
   }
 
   image(videoSource, 0, 0, destW, destH, sx, sy, sw, sh);
@@ -574,13 +557,6 @@ function drawSunnyEffect() {
     sw = srcW; sh = srcW / destRatio;
     sx = 0; sy = (srcH - sh) / 2;
   }
-  if (FORCE_MOBILE_CAMERA) {
-    const zSw = sw / MOBILE_CAMERA_ZOOM;
-    const zSh = sh / MOBILE_CAMERA_ZOOM;
-    sx += (sw - zSw) / 2; sy += (sh - zSh) / 2;
-    sw = zSw; sh = zSh;
-  }
-
   function makeStarPath(cx, cy, r) {
     ctx.beginPath();
     const inner = r * 0.42;
