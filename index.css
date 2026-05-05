@@ -407,7 +407,7 @@ body {
   .city-wrapper {
     position: fixed;
     right: 12px;
-    bottom: 15px;
+    bottom: 13px;
     align-items: flex-end;
     flex-direction: column-reverse;
     z-index: 5;
@@ -417,7 +417,7 @@ body {
   .filter-wrapper {
     position: fixed;
     left: 12px;
-    bottom: 15px;
+    bottom: 13px;
     align-items: flex-start;
     flex-direction: column-reverse;
     z-index: 5;
