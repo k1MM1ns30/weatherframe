@@ -384,7 +384,7 @@ body {
   .info {
     width: min(84vw, 340px);
     margin-top: 20px;
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1.3;
     text-align: center;
   }
@@ -405,7 +405,7 @@ body {
   .city-wrapper {
     position: fixed;
     right: 12px;
-    bottom: 12px;
+    bottom: 15px;
     align-items: flex-end;
     flex-direction: column-reverse;
     z-index: 5;
@@ -415,7 +415,7 @@ body {
   .filter-wrapper {
     position: fixed;
     left: 12px;
-    bottom: 12px;
+    bottom: 15px;
     align-items: flex-start;
     flex-direction: column-reverse;
     z-index: 5;
@@ -459,18 +459,18 @@ body {
 
   .city-btn,
   .filter-btn {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   #mapToggle,
   #filterToggle {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .location-modal-box p,
   #locationInput,
   .location-modal-btns button {
-    font-size: 17px;
+    font-size: 18px;
   }
 
     /* #cameraToggleBtn {
