@@ -1273,10 +1273,26 @@ if (captureBtn) {
       useCORS: true
     });
 
-    const link = document.createElement("a");
-    link.download = "weatherframe.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile && navigator.canShare) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+      const file = new File([blob], "weatherframe.png", { type: "image/png" });
+
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Weather Frame" });
+      } else {
+        const link = document.createElement("a");
+        link.download = "weatherframe.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      }
+    } else {
+      const link = document.createElement("a");
+      link.download = "weatherframe.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
 
     cityWrapper.style.visibility = "visible";
     filterWrapper.style.visibility = "visible";
