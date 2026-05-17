@@ -822,7 +822,9 @@ function loadCurrentLocationWeather() {
     },
     error => {
       console.error("Location error:", error);
-      document.getElementById("weather").textContent = "Location access denied";
+      const defaultCity = cityCoordinates["Seoul"];
+      document.getElementById("weather").innerHTML = `<p>Location access denied</p><p>Showing Seoul by default</p>`;
+      loadWeather(defaultCity.lat, defaultCity.lon, defaultCity.label);
     }
   );
 }
